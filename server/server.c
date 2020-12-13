@@ -7,6 +7,7 @@
 #include <arpa/inet.h> // inet_ntoa(), inet_aton()
 #include <unistd.h> // close(sockfd)
 #include <pthread.h>
+#include <errno.h> 
 
 #define BUFF_SIZE 100
 #define TRUE 1
@@ -35,31 +36,18 @@ pthread_mutex_t mutex;
 
 /* ---------------- Function Declaration ---------------- */
 
-struct user *newAccount();
-struct client *newClient();
-void readFile();
-void addClient(int connfd);
-void addAccount(char username[BUFF_SIZE], char password[BUFF_SIZE], int status);
-void rewriteFile(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status);
-void changeClientAccount(char account[BUFF_SIZE], int connfd);
-int is_empty(const char *s);
-int is_number(const char *s);
-void *recvmg(void *client_sock);
-void send_to_others(char *mesg, int curr);
-
-/* ---------------- Function Declaration ---------------- */
-
-struct user *newAccount();
-struct client *newClient();
 void init();
+struct user *newAccount();
+struct client *newClient();
 void readFile();
 void addClient(int connfd);
 void addAccount(char username[BUFF_SIZE], char password[BUFF_SIZE], int status);
+void deleteClient(int connfd);
 void rewriteFile(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status);
 void changeClientAccount(char account[BUFF_SIZE], int connfd);
 int is_empty(const char *s);
 int is_number(const char *s);
-void *recvmg(void *client_sock);
+void *loginSession(void *client_sock);
 void send_to_others(char *mesg, int curr);
 
 /* -------------------------- Main Function -------------------------- */
@@ -80,14 +68,17 @@ int main(int argc, char **argv) {
         exit(-1);
     }
 
+    init();
     readFile();
-    int listenfd, connfd, n, client_socket[max_clients], int opt = TRUE, activity, i, j, k, maxfd, current_size = 0;
+    int listenfd, connfd, n, client_socket[max_clients], opt = TRUE, activity, i, j, k, rc, maxfd, current_size = 0;
     const unsigned short SERV_PORT = atoi(argv[1]);
+    char buff[BUFF_SIZE] = {0};
     struct sockaddr_in cliaddr, servaddr;
     pthread_t recvt;
     pid_t childpid;
     socklen_t clilen;
     fd_set readfds;
+    struct timeval timeout;
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0); //Socket file descriptor used to identify the socket
     if (listenfd < 0) {
@@ -99,9 +90,7 @@ int main(int argc, char **argv) {
     servaddr.sin_addr.s_addr = inet_addr("192.168.100.2"); // My macbook internal ipv4 address
     servaddr.sin_port = htons(SERV_PORT);
 
-    // for (i = 0; i < max_clients; i++) {
-    //     client_socket[i] = -1;
-    // }
+    for (i = 0; i < max_clients; i++) client_socket[i] = -1;
 
     // Allow socket descriptor to be reuseable
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (char *) &opt, sizeof(opt)) < 0) {
@@ -126,84 +115,94 @@ int main(int argc, char **argv) {
     printf("Waiting for connections ...\n");
 
     for(;;) {
-        // // clear the socket set
-        // FD_ZERO(&readfds);
+        // clear the socket set
+        FD_ZERO(&readfds);
 
-        // // add master socket to set
-        // FD_SET(listenfd, &readfds);
-        // maxfd = listenfd;
+        // add master socket to set
+        FD_SET(listenfd, &readfds);
+        maxfd = listenfd;
 
-        // // add child sockets to set
-        // for (i = 0 ; i < max_clients ; i++)  {   
-		// 	//if valid socket descriptor then add to read list
-		// 	if(client_socket[i] > 0) FD_SET(client_socket[i], &readfds);
+        // add child sockets to set
+        for (i = 0 ; i < max_clients ; i++) {   
+			//if valid socket descriptor then add to read list
+			if(client_socket[i] > 0) FD_SET(client_socket[i], &readfds);
             
-        //     //highest file descriptor number, need it for the select function
-        //     if(client_socket[i] > maxfd) maxfd = client_socket[i];;
-        // }
+            //highest file descriptor number, need it for the select function
+            if(client_socket[i] > maxfd) maxfd = client_socket[i];;
+        }
 
-        // // wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
-        // activity = select(maxfd+1, &readfds, NULL, NULL, NULL);
+        timeout.tv_sec = 3;
+        timeout.tv_usec = 500000; // (microsecond) = 0.5s
+
+        // wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
+        activity = select(maxfd+1, &readfds, NULL, NULL, &timeout);
    
-        // if ((activity < 0) && (errno!=EINTR)) printf("select error");
+        if ((activity < 0) && (errno!=EINTR)) printf("select error");
 
-        // // If something happened on the master socket , then its an incoming connection
-        // if (FD_ISSET(listenfd, &readfds)) {
-        //     if ((connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen)) < 0) {
-        //         perror("accept");
-        //         exit(EXIT_FAILURE);
-        //     }
+        // If something happened on the master socket , then its an incoming connection
+        if (FD_ISSET(listenfd, &readfds)) {
+            if ((connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen)) < 0) {
+                perror("accept");
+                exit(EXIT_FAILURE);
+            }
          
-        //     // inform user of socket number - used in send and receive commands
-        //     printf("New connection from [%s:%d] - (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
-        //     current_size++;
+            // inform user of socket number - used in send and receive commands
+            printf("New connection from [%s:%d] - (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
+            current_size++;
              
-        //     // add new socket to array of sockets
-        //     for (i = 0; i < max_clients; i++) {
-        //         // if position is empty
-		// 		if(client_socket[i] == -1) {
-        //             client_socket[i] = connfd;
-        //             printf("Adding to list of sockets as %d\n", i);
-		// 			break;
-        //         }
-        //     }
-        // }
-        // // else its some IO operation on some other socket
-        // for (i = 0; i < current_size; i++) {
-        //     if (FD_ISSET(client_socket[i], &readfds)) {
-        //         // Check if it was for closing , and also read the incoming message
-        //         printf("------\nsocket(%d)...i(%d)...\n", client_socket[i], i);
-        //         if ((rc = read(client_socket[i], buff, sizeof(buff))) == 0) {
-        //             // Somebody disconnected , get his details and print
-        //             printf("Host disconnected: socket_fd(%d)\n", client_socket[i]);
-                    
-        //             // Close the socket and mark as 0 in list for reuse
-        //             close(client_socket[i]);
-        //             client_socket[i] = -1;
-        //             current_size--;
-        //             strcpy(login_account[i], "");
-        //             login_status[i] = 0;
-        //         }
-                
-        //         // Echo back
-        //         else {
-                    connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen); //Connection file descriptor used to distinguish client connections.
-                    if (connfd < 0) exit(1);
-                    printf("Received request from [%s:%d] - (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
-                    pthread_mutex_lock(&mutex);
+            // add new socket to array of sockets
+            for (i = 0; i < max_clients; i++) {
+                // if position is empty
+				if(client_socket[i] == -1) {
+                    client_socket[i] = connfd;
+                    printf("Adding to list of sockets as %d\n", i);
                     addClient(connfd);
+					break;
+                }
+            }
+        }
+        // else its some IO operation on some other socket
+        for (i = 0; i < current_size; i++) {
+            if (FD_ISSET(client_socket[i], &readfds)) {
+                // Check if it was for closing , and also read the incoming message
+                printf("--------------\n");
+                printf("Message from Socket[%d]...\n", client_socket[i]);
+                if ((rc = read(client_socket[i], buff, sizeof(buff))) == 0) {
+                    // Somebody disconnected , get his details and print
+                    printf("Host disconnected: socket_fd(%d)\n", client_socket[i]);
+                    
+                    // Close the socket and mark as 0 in list for reuse
+                    close(client_socket[i]);
+                    deleteClient(client_socket[i]);
+                    client_socket[i] = -1;
+                    current_size--;
+                }
+                
+                // Echo back
+                else {
+                    pthread_mutex_lock(&mutex);
                     // creating a thread for each client 
-                    pthread_create(&recvt, NULL, recvmg, &connfd);
+                    pthread_create(&recvt, NULL, loginSession, &client_socket[i]);
+                    pthread_join(recvt, NULL); //thread is closed
                     pthread_mutex_unlock(&mutex);
-        //         }
-        //     }
-        // }
+                }
+            }
+        }
     }
     // close(listenfd); // close listening socket
     return 0; 
 }
 
 /* -------------------------- Utilities --------------------------- */
+
+// Create account's text file
+void init() {
+    FILE *f = fopen("nguoidung.txt", "w");
+    fprintf(f, "hust hust123 1\n");
+    fprintf(f, "soict soictfit 0\n");
+    fprintf(f, "test test123 1\n");
+    fclose(f);
+}
 
 // Malloc Encapsulation
 struct user *newAccount() {
@@ -266,6 +265,28 @@ void addAccount(char username[BUFF_SIZE], char password[BUFF_SIZE], int status) 
     }
 }
 
+void deleteClient(int connfd) { 
+    struct client *temp = client1;
+    struct client *prev = NULL; 
+    // If head node itself holds the key to be deleted
+    if (temp != NULL && temp->connfd == connfd) { 
+        client1 = temp->next;   // Changed head 
+        free(temp);               // free old head 
+        return; 
+    } 
+    // Search for the key to be deleted, keep track of the 
+    // previous node as we need to change 'prev->next' 
+    while (temp != NULL && temp->connfd != connfd) { 
+        prev = temp;
+        temp = temp->next; 
+    } 
+    // If key was not present in linked list 
+    if (temp == NULL) return; 
+    // Unlink the node from linked list 
+    prev->next = temp->next; 
+    free(temp);  // Free memory 
+} 
+
 // Change password or change status and save to file
 void rewriteFile(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status) {
     FILE *f = fopen("nguoidung.txt", "w");
@@ -316,7 +337,7 @@ int is_number(const char *s) {
     return 1; // string is number
 }
 
-void *recvmg(void *client_sock) {
+void *loginSession(void *client_sock) {
 	int connfd = *((int *)client_sock);
     char buff[BUFF_SIZE] = {0};
 	int n;
