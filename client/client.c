@@ -12,7 +12,7 @@
 
 int menu(){
 	int op;
-	printf("***********MENU*************\n");
+	printf("***********MENU**************\n");
 	printf("1. Play.\n");
 	printf("2. How to play.\n");
 	printf("3. High score.\n");
