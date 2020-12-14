@@ -16,7 +16,7 @@ int menu(){
 	int op;
 	char input[MAXLINE];
 	do{
-		printf("-------------MENU-------------\n");
+		printf("\n-------------MENU-------------\n");
 		printf("1. Play.\n");
 		printf("2. How to play.\n");
 		printf("3. High score.\n");
@@ -50,8 +50,8 @@ int menuplay(){
 void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
-    char data[MAXLINE], data1[MAXLINE], str[MAXLINE];
-    int n, n1, op_play;
+    char data[MAXLINE], str[MAXLINE];
+    int n, op_play;
 	while(1) {
 	    n =  recv(sockfd,data,MAXLINE,0 );
 	    if(n == 0 ){
@@ -60,28 +60,7 @@ void *recvmg(void *my_sock){
 	    }
 	    data[n] = '\0';
 	    printf("[%s]\n", data);
-	    if(strcmp(data, "OK") == 0){
-			op_play = menuplay();
-			// sprintf(str,"%d", op_play);
-			// send(sockfd, str, strlen(str), 0);
-	// fix***********************************************************************
-			switch(op_play){
-	// change password
-				case 1:
-					printf("Enter new password: ");
-					scanf(" %[^\n]", str);
-					send(sockfd , str , strlen(str) , 0 );
-					break;
-	// choose mode
-				case 2:
-				break;
-	// log out
-				case 3:
-				break;
-				default: return 0;
-			}
-		}
-    }
+     }
 }
 
 int main() {
@@ -92,7 +71,7 @@ int main() {
     struct sockaddr_in servaddr, cliaddr; 
     char ser_address[MAXLINE] = {0};
     // menu
-	int op;
+	int op, op_play;
 	char str[MAXLINE] = {0};
 	do{
 		op = menu();
@@ -138,6 +117,43 @@ int main() {
 				        }
 				        if(check == 0) break;
 				        send(sockfd , sendBuff , strlen(sendBuff) , 0 );
+				        recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+				    	if (recvBytes == 0) {
+				    	    perror("The server terminated prematurely");
+				    	    exit(4);
+				    	    return 0;
+				    	} else {
+				    	    recvBuff[recvBytes] = '\0';
+				    	    printf("%s\n", recvBuff);
+				    	    if(strcmp(recvBuff, "OK") == 0){
+				    	    	do{
+									op_play = menuplay();
+									switch(op_play){
+							// change password
+										case 1:
+											printf("Enter new password: ");
+											scanf(" %[^\n]", str);
+											send(sockfd , str , strlen(str) , 0 );
+											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									    	if (recvBytes == 0) {
+									    	    perror("The server terminated prematurely");
+									    	    exit(4);
+									    	    return 0;
+									    	}
+								    	    recvBuff[recvBytes] = '\0';
+								    	    printf("%s\n", recvBuff);
+										break;
+							// choose mode
+										case 2:
+										break;
+							// log out
+										case 3:
+										break;
+										default: return 0;
+									}
+								}while(op != 4);
+							}
+				    	}
 				    }
 				    pthread_mutex_unlock(&mutex);
 				}
