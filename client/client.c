@@ -37,13 +37,14 @@ int menuplay(){
 		printf("\n************************************\n");
 		printf("\tMenu play\n");
 		printf("\t1. Change password.\n");
-		printf("\t2. Choose mode.\n");
-		printf("\t3. Log out.\n");
-		printf("\t4. Exit.\n");
+		printf("\t2. Choose mode online.\n");
+		printf("\t3. Choose mode offline.\n");
+		printf("\t4. Log out.\n");
+		printf("\t5. Exit.\n");
 		scanf(" %[^\n]", input);
 	    if (strlen(input) != 1 || !isdigit(input[0])) break;
 	    op = atoi(input);
-	}while(op > 4 || op < 1);
+	}while(op > 5 || op < 1);
 	return op;
 }
 
@@ -101,10 +102,10 @@ int main() {
 			    	char c;
 			    	scanf("%c", &c);
 			    	pthread_mutex_lock(&mutex);
-				    if (pthread_create(&recvt, NULL,(void *)recvmg, &sockfd) < 0) {
-				    	printf("Error creating thread\n");
-				    	exit(1);
-				    }
+				    // if (pthread_create(&recvt, NULL,(void *)recvmg, &sockfd) < 0) {
+				    // 	printf("Error creating thread\n");
+				    // 	exit(1);
+				    // }
 				    while(fgets( sendBuff, MAXLINE, stdin) != NULL){
 				        char *tmp = strstr(sendBuff, "\n");
 				        if(tmp != NULL) *tmp = '\0';
@@ -124,14 +125,24 @@ int main() {
 				    	    return 0;
 				    	} else {
 				    	    recvBuff[recvBytes] = '\0';
-				    	    printf("%s\n", recvBuff);
+				    	    printf("%s", recvBuff);
 				    	    if(strcmp(recvBuff, "OK") == 0){
 				    	    	do{
 									op_play = menuplay();
+									sprintf(str,"%d", op_play);
+									send(sockfd, str,strlen(str), 0);
+							//gui option sang server
 									switch(op_play){
 							// change password
 										case 1:
-											printf("Enter new password: ");
+											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									    	if (recvBytes == 0) {
+									    	    perror("The server terminated prematurely");
+									    	    exit(4);
+									    	    return 0;
+									    	}
+								    	    recvBuff[recvBytes] = '\0';
+								    	    printf("%s: ", recvBuff);
 											scanf(" %[^\n]", str);
 											send(sockfd , str , strlen(str) , 0 );
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
@@ -145,13 +156,39 @@ int main() {
 										break;
 							// choose mode
 										case 2:
+											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									    	if (recvBytes == 0) {
+									    	    perror("The server terminated prematurely");
+									    	    exit(4);
+									    	    return 0;
+									    	}
+								    	    recvBuff[recvBytes] = '\0';
+								    	    printf("%s: ", recvBuff);
 										break;
 							// log out
 										case 3:
+											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									    	if (recvBytes == 0) {
+									    	    perror("The server terminated prematurely");
+									    	    exit(4);
+									    	    return 0;
+									    	}
+								    	    recvBuff[recvBytes] = '\0';
+								    	    printf("%s: ", recvBuff);
+										break;
+										case 4:
+											// recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									  //   	if (recvBytes == 0) {
+									  //   	    perror("The server terminated prematurely");
+									  //   	    exit(4);
+									  //   	    return 0;
+									  //   	}
+								   //  	    recvBuff[recvBytes] = '\0';
+								   //  	    printf("%s: ", recvBuff);
 										break;
 										default: return 0;
 									}
-								}while(op != 4);
+								}while(op_play != 5 && op_play != 4);
 							}
 				    	}
 				    }
