@@ -207,14 +207,14 @@ int main() {
 								    	    printf("%s: ", recvBuff);
 										break;
 										case 4:
-											// recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
-									  //   	if (recvBytes == 0) {
-									  //   	    perror("The server terminated prematurely");
-									  //   	    exit(4);
-									  //   	    return 0;
-									  //   	}
-								   //  	    recvBuff[recvBytes] = '\0';
-								   //  	    printf("%s: ", recvBuff);
+											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+									    	if (recvBytes == 0) {
+									    	    perror("The server terminated prematurely");
+									    	    exit(4);
+									    	    return 0;
+									    	}
+								    	    recvBuff[recvBytes] = '\0';
+								    	    printf("%s: ", recvBuff);
 										break;
 										default: return 0;
 									}
@@ -227,6 +227,11 @@ int main() {
 				close(sockfd);
 			break;
 			case 2:
+				printf("*****How to play*****\n");
+				printf("1. Chon play de dang nhap.\n");
+				printf("2. Sau khi dang nhap chon choi online va offline\n");
+				printf("3. Neu chon chuc nang choi online, cho khoang 30s \n   de cho nguoi choi thu 2.\n");
+				printf("4. 2 nguoi choi se thi dau voi nhau roi chon nguoi \n   ra nguoi chien thang de choi game.\n");			
 			break;
 			case 3:
 			break;
