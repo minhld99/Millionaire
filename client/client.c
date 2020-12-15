@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ctype.h>
+#include <time.h>
 #define MAXLINE 100
 
 pthread_mutex_t mutex;
@@ -73,7 +74,7 @@ int main() {
     char ser_address[MAXLINE] = {0};
     // menu
 	int op, op_play;
-	char str[MAXLINE] = {0};
+	char str[MAXLINE] = {0}, *input;
 	do{
 		op = menu();
 		switch(op){
@@ -109,7 +110,7 @@ int main() {
 				    while(fgets( sendBuff, MAXLINE, stdin) != NULL){
 				        char *tmp = strstr(sendBuff, "\n");
 				        if(tmp != NULL) *tmp = '\0';
-				        int check = 0;
+				        int check = 0, count, answer;
 				        for(int i = 0; i < strlen(sendBuff); i ++){
 				            if(sendBuff[i] != ' ' && sendBuff[i] != '\0'){
 				                check = 1;
@@ -156,17 +157,18 @@ int main() {
 										break;
 							// choose mode
 										case 2:
-											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+										recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
 									    	    perror("The server terminated prematurely");
 									    	    exit(4);
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+								    	    printf("%s\n", recvBuff);
 										break;
 							// log out
 										case 3:
+										do{
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
 									    	    perror("The server terminated prematurely");
@@ -174,7 +176,25 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
+								    	    clock_t begin = clock();
 								    	    printf("%s: ", recvBuff);
+								    	    do{
+								    	   		scanf(" %[^\n]", input);
+	    										if (strlen(input) != 1 || !isdigit(input[0])) break;
+	    										answer = atoi(input);
+	    										if(answer <= 4 && answer >=1)
+	    											send(sockfd,input,strlen(input), 0);
+	    									}while(answer > 4 || answer <1);
+	    									clock_t end = clock();
+	    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
+	    									sprintf(input,"%f", time_answer);
+	    									printf("Time: %f\n", time_answer);
+	    						//fix here
+	    									if(strcmp(recvBuff,"Your answer is correct.") == 0){
+		    									send(sockfd,input, strlen(input), 0);
+		    								}
+	    								}while(strcmp(recvBuff,"Incorrect") != 0);
+
 										break;
 										case 4:
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
@@ -184,7 +204,8 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+								    	    printf("%s\n", recvBuff);
+
 										break;
 										default: return 0;
 									}
