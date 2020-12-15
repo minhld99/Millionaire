@@ -37,8 +37,8 @@ int menuplay(){
 		printf("\n************************************\n");
 		printf("\tMenu play\n");
 		printf("\t1. Change password.\n");
-		printf("\t2. Choose mode offline.\n");
-		printf("\t3. Choose mode online.\n");
+		printf("\t2. Choose mode online.\n");
+		printf("\t3. Choose mode offline.\n");
 		printf("\t4. Log out.\n");
 		printf("\t5. Exit.\n");
 		scanf(" %[^\n]", input);
@@ -154,8 +154,8 @@ int main() {
 								    	    recvBuff[recvBytes] = '\0';
 								    	    printf("%s\n", recvBuff);
 										break;
-							// choose mode
-										case 2:
+							// choose mode offline
+										case 3:
 											while(1) {
 												recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 												if (recvBytes == 0) {
@@ -164,39 +164,23 @@ int main() {
 									    	    	return 0;
 												}
 												recvBuff[recvBytes] = '\0';
-								    	    	printf("%s: ", recvBuff);
-												// if(strcmp(recvBuff, "Correct") != 0 && strcmp(recvBuff, "InCorrect") != 0) {
-												// 	do {
-												// 		scanf(" %[^\n]", str);
-												// 		int answer;
-												// 		switch (str) {
-												// 		case "A": 
-												// 			answer = 1;
-												// 			sprintf(str,"%d", answer);
-												// 			break;
-												// 		case "B":
-												// 			answer = 2;
-												// 			sprintf(str,"%d", answer);
-												// 			break;
-												// 		case "C":
-												// 			answer = 3;
-												// 			sprintf(str,"%d", answer);
-												// 			break;
-												// 		case "D":
-												// 			answer = 4;
-												// 			sprintf(str,"%d", answer);
-												// 			break;
-												// 		default:
-												// 			break;
-												// 		} 
-												// 		send(sockfd , str , strlen(str) , 0 );
-												// 	} while (strcmp(str, "A") != 0 && strcmp(str, "B") != 0 && strcmp(str, "C") != 0 && strcmp(str, "D") != 0);
-													
-												// }
+								    	    	printf("%s", recvBuff);
+												//if(strcmp(recvBuff, "Correct") != 0 && strcmp(recvBuff, "InCorrect") != 0) {
+													do {
+														scanf(" %[^\n]", str);
+														int answer = 0;
+														if (strcmp(str, "A") == 0) answer = 1;
+														else if (strcmp(str, "B") == 0) answer = 2;
+															 else if (strcmp(str, "C") == 0) answer = 3;
+															 	  else if (strcmp(str, "D") == 0) answer = 4;
+														sprintf(str,"%d", answer);
+														send(sockfd , str , strlen(str) , 0 );
+													} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0);
+												//}
 									    	}
 										break;
-							// log out
-										case 3:
+							// choose mode online
+										case 2:
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
 									    	    perror("The server terminated prematurely");
@@ -206,6 +190,7 @@ int main() {
 								    	    recvBuff[recvBytes] = '\0';
 								    	    printf("%s: ", recvBuff);
 										break;
+							// log out
 										case 4:
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
@@ -236,7 +221,7 @@ int main() {
 			case 3:
 			break;
 			case 4:
-				printf("--------------------------\n");
+				printf("*********Credit*********\n");
 				printf("1. Nguyen Thi Thuy Linh\n");
 				printf("2. Luong Duc Minh\n");
 				printf("3. Nguyen Thanh Ha\n");
