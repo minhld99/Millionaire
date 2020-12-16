@@ -6,7 +6,7 @@
 * [Technology](#technology)
 * [Setup](#setup)
 
-=============================
+=======================================================
 
 ## General Info
 Vietnamese version of gameshow "Who wants to be a millionaire" written in C and run directly on terminal.
@@ -24,8 +24,14 @@ Socket Programming in C
 * SQLite3 (Database)
 
 ## Setup
-Port forwarding and clone needed...
-<br>Minh's Device External IPv4 Address: `14.248.75.42` (For testing purposes only)
+<b>For running on local:</b>
+- Uncomment this line `servaddr.sin_addr.s_addr = htonl(INADDR_ANY);`
+- Open the same port on server and client side:  
+```$ ./server 5000```
+
+<b>If server & client on different network</b>: 
+- Port forwarding and clone needed...
+- Minh's Device External IPv4 Address: `14.248.75.42` (For testing purposes only)
 
 1. <b> Open server (on Minh's Device) </b>
 ```

@@ -8,11 +8,21 @@
 #include <unistd.h> // close(sockfd)
 #include <pthread.h>
 #include <errno.h> 
+#include <time.h> // rand()
 
-#define BUFF_SIZE 100
+#define BUFF_SIZE 1000
 #define TRUE 1
 #define FALSE 0
 #define max_clients 100
+
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
 
 struct user {
     char username[BUFF_SIZE];
@@ -31,6 +41,23 @@ struct client {
 };
 struct client *client1 = NULL;
 
+struct question {
+    int index;
+    char question[BUFF_SIZE];
+    char answerA[BUFF_SIZE];
+    char answerB[BUFF_SIZE];
+    char answerC[BUFF_SIZE];
+    char answerD[BUFF_SIZE];
+    int true; // true = {1, 2, 3, 4}
+    int used; // used = {0, 1}
+};
+// struct question questions[BUFF_SIZE];
+
+struct level {
+    struct question questions[BUFF_SIZE];
+};
+struct level questionBank[15];
+
 char online_user[BUFF_SIZE]; // Who are online?
 pthread_mutex_t mutex;
 
@@ -39,11 +66,15 @@ pthread_mutex_t mutex;
 void init();
 struct user *newAccount();
 struct client *newClient();
-void readFile();
+void readUserFILE();
+void readQuestionFILE();
+void addQuestion(int index, int level, char question[BUFF_SIZE], char answerA[BUFF_SIZE], char answerB[BUFF_SIZE], 
+                    char answerC[BUFF_SIZE], char answerD[BUFF_SIZE], int true);
 void addClient(int connfd);
 void addAccount(char username[BUFF_SIZE], char password[BUFF_SIZE], int status);
 void deleteClient(int connfd);
-void rewriteFile(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status);
+
+void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status);
 void changeClientAccount(char account[BUFF_SIZE], int connfd);
 int is_empty(const char *s);
 int is_number(const char *s);
@@ -69,7 +100,8 @@ int main(int argc, char **argv) {
     }
 
     init();
-    readFile();
+    readUserFILE();
+    readQuestionFILE();
     int listenfd, connfd, n, client_socket[max_clients], opt = TRUE, activity, i, j, k, rc, maxfd, current_size = 0;
     const unsigned short SERV_PORT = atoi(argv[1]);
     char buff[BUFF_SIZE] = {0};
@@ -78,7 +110,19 @@ int main(int argc, char **argv) {
     pid_t childpid;
     socklen_t clilen;
     fd_set readfds;
-    struct timeval timeout;
+    // struct timeval timeout;
+
+    // for (i = 0; i < 15; i++) {
+    //     for (j = 0; j < 10; j++) {
+    //         printf("(%s)\n(%s)\n(%s)\n(%s)\n(%s)\n(%d)\n", 
+    //         questionBank[i].questions[j].question, 
+    //         questionBank[i].questions[j].answerA, 
+    //         questionBank[i].questions[j].answerB, 
+    //         questionBank[i].questions[j].answerC, 
+    //         questionBank[i].questions[j].answerD, 
+    //         questionBank[i].questions[j].true);
+    //     }
+    // }
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0); //Socket file descriptor used to identify the socket
     if (listenfd < 0) {
@@ -87,7 +131,8 @@ int main(int argc, char **argv) {
     }
 
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr("192.168.100.2"); // My macbook internal ipv4 address
+    // servaddr.sin_addr.s_addr = inet_addr("192.168.100.15"); // Minh's macbook internal ipv4 address
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // For running on local
     servaddr.sin_port = htons(SERV_PORT);
 
     for (i = 0; i < max_clients; i++) client_socket[i] = -1;
@@ -131,11 +176,11 @@ int main(int argc, char **argv) {
             if(client_socket[i] > maxfd) maxfd = client_socket[i];;
         }
 
-        timeout.tv_sec = 3;
-        timeout.tv_usec = 500000; // (microsecond) = 0.5s
+        // timeout.tv_sec = 3;
+        // timeout.tv_usec = 500000; // (microsecond) = 0.5s
 
         // wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
-        activity = select(maxfd+1, &readfds, NULL, NULL, &timeout);
+        activity = select(maxfd+1, &readfds, NULL, NULL, NULL);
    
         if ((activity < 0) && (errno!=EINTR)) printf("select error");
 
@@ -180,11 +225,10 @@ int main(int argc, char **argv) {
                 
                 // Echo back
                 else {
-                    pthread_mutex_lock(&mutex);
-                    // creating a thread for each client 
+                    // pthread_mutex_lock(&mutex);
                     pthread_create(&recvt, NULL, loginSession, &client_socket[i]);
                     pthread_join(recvt, NULL); //thread is closed
-                    pthread_mutex_unlock(&mutex);
+                    // pthread_mutex_unlock(&mutex);
                 }
             }
         }
@@ -222,7 +266,7 @@ struct client *newClient() {
 }
 
 // Read from file into linked list
-void readFile() {
+void readUserFILE() {
     char str[100];
     FILE *f = fopen("nguoidung.txt", "r");
     if (f == NULL) {
@@ -236,6 +280,61 @@ void readFile() {
         addAccount(name, pass, status);
     }
     fclose(f);
+}
+
+void readQuestionFILE() {
+    char str[BUFF_SIZE];
+    char level[BUFF_SIZE];
+    FILE *f = fopen("offline_db.txt", "r");
+    if (f == NULL) {
+        printf("Error opening file!\n");   
+        exit(1);             
+    }
+    // if ((fgets(str, sizeof(str), f)) == NULL) return;
+    for (int i = 0; i < 15; i++) {
+        if ((fgets(str, sizeof(str), f)) == NULL) return;
+        for (int j = 0; j < 10; j++) {
+            char question[BUFF_SIZE];
+            if ((fgets(question, sizeof(question), f)) == NULL) return;
+            char *offset = strstr(question, "\n");
+            if (offset != NULL) *offset = '\0';
+            char answerA[BUFF_SIZE];
+            if ((fgets(answerA, sizeof(answerA), f)) == NULL) return;
+            offset = strstr(answerA, "\n");
+            if (offset != NULL) *offset = '\0';
+            char answerB[BUFF_SIZE];
+            if ((fgets(answerB, sizeof(answerB), f)) == NULL) return;
+            offset = strstr(answerB, "\n");
+            if (offset != NULL) *offset = '\0';
+            char answerC[BUFF_SIZE];
+            if ((fgets(answerC, sizeof(answerC), f)) == NULL) return;
+            offset = strstr(answerC, "\n");
+            if (offset != NULL) *offset = '\0';
+            char answerD[BUFF_SIZE];
+            if ((fgets(answerD, sizeof(answerD), f)) == NULL) return;
+            offset = strstr(answerD, "\n");
+            if (offset != NULL) *offset = '\0';
+            if ((fgets(str, sizeof(str), f) == NULL)) return;
+            offset = strstr(answerD, "\n");
+            if (offset != NULL) *offset = '\0';
+            int true = atoi(str);
+            addQuestion(j, i+1, question, answerA, answerB, answerC, answerD, true);
+            // printf("%s\nA. %s\nB. %s\nC. %s\nD. %s\n", question, answerA, answerB, answerC, answerD);
+        }
+    }
+    fclose(f);
+}
+
+void addQuestion(int index, int level, char question[BUFF_SIZE], char answerA[BUFF_SIZE], char answerB[BUFF_SIZE], 
+                    char answerC[BUFF_SIZE], char answerD[BUFF_SIZE], int true) {
+    
+    strcpy(questionBank[level-1].questions[index].question, question);
+    strcpy(questionBank[level-1].questions[index].answerA, answerA);
+    strcpy(questionBank[level-1].questions[index].answerB, answerB);
+    strcpy(questionBank[level-1].questions[index].answerC, answerC);
+    strcpy(questionBank[level-1].questions[index].answerD, answerD);
+    questionBank[level-1].questions[index].true = true;
+    questionBank[level-1].questions[index].used = 0;
 }
 
 // Add client to linked list
@@ -288,7 +387,7 @@ void deleteClient(int connfd) {
 } 
 
 // Change password or change status and save to file
-void rewriteFile(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status) {
+void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status) {
     FILE *f = fopen("nguoidung.txt", "w");
     if (f == NULL) {
         printf("Error opening file!\n");   
@@ -342,50 +441,51 @@ void *loginSession(void *client_sock) {
     char buff[BUFF_SIZE] = {0};
 	int n;
     strcpy(buff, "Enter username: ");
-    send(connfd, buff, BUFF_SIZE, 0);
+    send(connfd, buff, strlen(buff), 0);
 	while((n = recv(connfd, buff, BUFF_SIZE, 0)) > 0) {
         struct client *cli = client1;
         while (cli->connfd != connfd && cli != NULL) cli = cli->next;
         char mesg[BUFF_SIZE] = {0};
         buff[n] = '\0';
-        printf("[%d]: %s\n", connfd, buff);
+        printf(CYN "[%d]: %s\n" RESET, connfd, buff);
         if (cli->login_status == 0) {
             struct user *tmp = head;
             while (tmp != NULL) {
                 if (strcmp(tmp->username, buff) == 0) {
-                    strcpy(mesg, "Insert password");
-                    send(connfd, mesg, BUFF_SIZE, 0);
+                    strcpy(mesg, "Insert password: ");
+                    send(connfd, mesg, strlen(mesg), 0);
                     n = recv(connfd, buff, BUFF_SIZE, 0);
                     if (n < 0) {
                         perror("Read error");
                         exit(1);
                     }
                     buff[n] = '\0';
-                    printf("[%d]: %s\n", cli->connfd, buff);
+                    printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
                     if (strcmp(tmp->password, buff) == 0) {
                         if (tmp->status == 0 || tmp->status == 2) {
                             strcpy(mesg, "account not ready");
-                            send(connfd, mesg, BUFF_SIZE, 0);
+                            send(connfd, mesg, strlen(mesg), 0);
                         } 
                         else {
                             tmp->count = 1;
                             strcpy(mesg, "OK");
                             changeClientAccount(tmp->username, connfd);
-                            send(connfd, mesg, BUFF_SIZE, 0);
+                            send(connfd, mesg, strlen(mesg), 0);
                             strcpy(online_user, tmp->username);
                             cli->login_status = 1;
                         }
                     }
                     else {
                         if (tmp->count == 3) {
-                            rewriteFile(tmp->username, tmp->password, 0); // 0 : blocked
+                            updateUserFILE(tmp->username, tmp->password, 0); // 0 : blocked
                             strcpy(mesg, "Account is blocked");
-                            send(connfd, mesg, BUFF_SIZE, 0);
+                            printf("%s\n", mesg);
+                            send(connfd, mesg, strlen(mesg), 0);
                         }
                         else {
                             strcpy(mesg, "Not OK");
                             tmp->count++;
-                            send(connfd, mesg, BUFF_SIZE, 0);
+                            send(connfd, mesg, strlen(mesg), 0);
                         }
                     }
                     break;
@@ -394,7 +494,7 @@ void *loginSession(void *client_sock) {
             }
             if (tmp == NULL) {
                 strcpy(mesg, "Wrong account! Please register first.");
-                send(connfd, mesg, BUFF_SIZE, 0);
+                send(connfd, mesg, strlen(mesg), 0);
                 continue;
             }
         }
@@ -403,41 +503,103 @@ void *loginSession(void *client_sock) {
             if (strcmp(buff, "bye") == 0) {
                 strcpy(mesg, "Goodbye ");
                 strcat(mesg, online_user);
-                // printf("[%s:%d]: %s\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), mesg);
                 changeClientAccount("", connfd);
                 cli->login_status = 0;
                 strcpy(online_user, "");
-                send(connfd, mesg, BUFF_SIZE, 0);
+                send(connfd, mesg, strlen(mesg), 0);
                 continue;
             }
-            int alphabet = 0, number = 0, i; 
-            char alpha[BUFF_SIZE] = {0}, digit[BUFF_SIZE] = {0}; 
-            for (i=0; buff[i]!= '\0'; i++) { 
-                // check for alphabets 
-                if (isalpha(buff[i]) != 0) {
-                    alpha[alphabet] = buff[i];
-                    alphabet++; 
+            else if (strcmp(buff, "1") == 0) {
+                strcpy(mesg, "Enter new password");
+                send(connfd, mesg, strlen(mesg), 0);
+                if ((n = recv(connfd, buff, BUFF_SIZE, 0)) < 0) {
+                    perror("Read error");
+                    exit(1);
                 }
-                // check for decimal digits 
-                else if (isdigit(buff[i]) != 0) {
-                    digit[number] = buff[i];
-                    number++; 
+                buff[n] = '\0';
+                printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
+                int alphabet = 0, number = 0, i; 
+                char alpha[BUFF_SIZE] = {0}, digit[BUFF_SIZE] = {0}; 
+                for (i=0; buff[i]!= '\0'; i++) { 
+                    // check for alphabets 
+                    if (isalpha(buff[i]) != 0) {
+                        alpha[alphabet] = buff[i];
+                        alphabet++; 
+                    }
+                    // check for decimal digits 
+                    else if (isdigit(buff[i]) != 0) {
+                        digit[number] = buff[i];
+                        number++; 
+                    }
+                    else {
+                        alphabet = 0; number = 0;
+                        strcpy(mesg, "Error");
+                        send(connfd, mesg, strlen(mesg), 0);
+                        break;
+                    }
                 }
-                else {
-                    alphabet = 0; number = 0;
-                    strcpy(mesg, "Error");
-                    // printf("[%s:%d]: %s\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), mesg);
-                    send(connfd, mesg, n, 0);
-                    break;
+                if (alphabet != 0 || number != 0) {
+                    strcpy(mesg, digit);
+                    strcat(mesg, alpha);
+                    send(connfd, mesg, strlen(mesg), 0);
+                    updateUserFILE(online_user, buff, 3); // 3 ~ keep the current status
+                    send_to_others(buff, connfd);
                 }
             }
-            if (alphabet != 0 || number != 0) {
-                strcpy(mesg, digit);
-                strcat(mesg, alpha);
-                // printf("[%s:%d]: %s\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), mesg);
-                send(connfd, mesg, n, 0);
-                rewriteFile(online_user, buff, 3); // 3 ~ keep the current status
-                send_to_others(buff, connfd);
+            else if (strcmp(buff, "2") == 0) {
+                strcpy(mesg, "You choose mode online");
+                send(connfd, mesg, strlen(mesg), 0);
+            }
+            else if (strcmp(buff, "3") == 0) {
+                // strcpy(mesg, "You choose mode offline");
+                srand(time(0));
+                // printf(RED "red\n"     RESET);
+                // printf(GRN "green\n"   RESET);
+                // printf(YEL "yellow\n"  RESET);
+                // printf(BLU "blue\n"    RESET);
+                // printf(MAG "magenta\n" RESET);
+                // printf(CYN "cyan\n"    RESET);
+                // printf(WHT "white\n"   RESET);
+                int i;
+                for (i = 0; i < 15; i++) {
+                    char tmp[BUFF_SIZE] = {0};
+                    int j = (rand() % (9 - 0 + 1)) + 0;
+                    sprintf(tmp, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
+                    questionBank[i].questions[j].question, 
+                    questionBank[i].questions[j].answerA, 
+                    questionBank[i].questions[j].answerB, 
+                    questionBank[i].questions[j].answerC, 
+                    questionBank[i].questions[j].answerD);
+                    if (i == 15) strcpy(mesg, "\nChúc mừng bạn đã trả lời đúng 15 câu hỏi!\n\n");
+                    else if (i != 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                    else strcpy(mesg, tmp);
+                    printf("%s\n", mesg);
+                    if (send(connfd, mesg, strlen(mesg), 0) == -1) {
+                        // printf("Host disconnected: socket_fd(%d)\n", client_socket[i]);
+                        break;
+                    }
+                    if ((n = recv(connfd, buff, BUFF_SIZE, 0) > 0)) {
+                        buff[n] = '\0';
+                        printf(CYN "[%d]: %s\n" RESET, connfd, buff);
+                        if (atoi(buff) == 5) {
+
+                        }
+                        else if (atoi(buff) != questionBank[i].questions[j].true) {
+                            sprintf(mesg, "Sai! Đáp án đúng là %d\n", questionBank[i].questions[j].true);
+                            printf("%s\n", mesg);
+                            send(connfd, mesg, strlen(mesg), 0);
+                            break;
+                        }
+                    } 
+                    else if (n < 0) {
+                        perror("Read error");
+                        exit(1);
+                    }
+                }
+                if (i == 15) {
+                    strcpy(mesg, "\nChúc mừng bạn đã trả lời đúng 15 câu hỏi!\n\n");
+                    send(connfd, mesg, strlen(mesg), 0);
+                }
             }
         }
     }
