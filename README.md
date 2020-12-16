@@ -2,7 +2,7 @@
 
 ## Table of contents
 * [General Info](#general-info)
-* [Members/Contributors](#member)
+* [Members/Contributors](#member-(3))
 * [Technology](#technology)
 * [Setup](#setup)
 
