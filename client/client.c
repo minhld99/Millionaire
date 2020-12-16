@@ -150,15 +150,7 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-											//printf(WHT "white\n"   RESET);
-								    	    printf(CYN "%s: " RESET, recvBuff);
-											//printf(RED "red\n"     RESET);
-											// printf(GRN "green\n"   RESET);
-											// printf(YEL "yellow\n"  RESET);
-											// printf(BLU "blue\n"    RESET);
-											// printf(MAG "magenta\n" RESET);
-											// printf(CYN "cyan\n"    RESET);
-											
+											printf("%s: ", recvBuff);
 											scanf(" %[^\n]", str);
 											send(sockfd , str , strlen(str) , 0 );
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
@@ -180,7 +172,15 @@ int main() {
 									    	    	return 0;
 												}
 												recvBuff[recvBytes] = '\0';
-								    	    	printf("%s", recvBuff);
+								    	    	//printf("%s", recvBuff);
+												printf(CYN "%s: " RESET, recvBuff);
+												//printf(WHT "white\n"   RESET);
+												//printf(RED "red\n"     RESET);
+												// printf(GRN "green\n"   RESET);
+												// printf(YEL "yellow\n"  RESET);
+												// printf(BLU "blue\n"    RESET);
+												// printf(MAG "magenta\n" RESET);
+												// printf(CYN "cyan\n"    RESET);
 												if(strstr(recvBuff, "Sai! Đáp án đúng là") == NULL && strstr(recvBuff, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL) {
 													do {
 														scanf(" %[^\n]", str);
