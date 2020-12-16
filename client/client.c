@@ -155,12 +155,7 @@ int main() {
 								    	    recvBuff[recvBytes] = '\0';
 								    	    printf("%s\n", recvBuff);
 										break;
-							// choose mode
 										case 2:
-
-										break;
-							// log out
-										case 3:
 										do{
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
@@ -187,6 +182,9 @@ int main() {
 		    									send(sockfd,input, strlen(input), 0);
 		    								}
 	    								}while(strcmp(recvBuff,"Incorrect") != 0);
+
+										break;
+										case 3:
 
 										break;
 										case 4:
