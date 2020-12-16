@@ -8,7 +8,15 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ctype.h>
-#define MAXLINE 100
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+#define MAXLINE 1000
 
 pthread_mutex_t mutex;
 
@@ -142,7 +150,15 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+											//printf(WHT "white\n"   RESET);
+								    	    printf(CYN "%s: " RESET, recvBuff);
+											//printf(RED "red\n"     RESET);
+											// printf(GRN "green\n"   RESET);
+											// printf(YEL "yellow\n"  RESET);
+											// printf(BLU "blue\n"    RESET);
+											// printf(MAG "magenta\n" RESET);
+											// printf(CYN "cyan\n"    RESET);
+											
 											scanf(" %[^\n]", str);
 											send(sockfd , str , strlen(str) , 0 );
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
@@ -165,18 +181,39 @@ int main() {
 												}
 												recvBuff[recvBytes] = '\0';
 								    	    	printf("%s", recvBuff);
-												//if(strcmp(recvBuff, "Correct") != 0 && strcmp(recvBuff, "InCorrect") != 0) {
+												if(strstr(recvBuff, "Sai! Đáp án đúng là") == NULL && strstr(recvBuff, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL) {
 													do {
 														scanf(" %[^\n]", str);
 														int answer = 0;
-														if (strcmp(str, "A") == 0) answer = 1;
-														else if (strcmp(str, "B") == 0) answer = 2;
-															 else if (strcmp(str, "C") == 0) answer = 3;
-															 	  else if (strcmp(str, "D") == 0) answer = 4;
-														sprintf(str,"%d", answer);
-														send(sockfd , str , strlen(str) , 0 );
-													} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0);
-												//}
+														if (strcmp(str, "A") == 0) {
+															answer = 1;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "B") == 0) {
+															answer = 2;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "C") == 0) {
+															answer = 3;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "D") == 0) {
+															answer = 4;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "H") == 0) {
+															answer = 5;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (answer == 0) sprintf(str,"%d", answer);
+														if (strcmp(str, "0") == 0) printf("Đáp án của bạn: ");
+													} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0 && strcmp(str, "5") != 0);
+												} else break;
 									    	}
 										break;
 							// choose mode online
