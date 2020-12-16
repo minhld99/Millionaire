@@ -9,7 +9,15 @@
 #include <sys/socket.h>
 #include <ctype.h>
 #include <time.h>
-#define MAXLINE 100
+#define RED   "\x1B[31m"
+#define GRN   "\x1B[32m"
+#define YEL   "\x1B[33m"
+#define BLU   "\x1B[34m"
+#define MAG   "\x1B[35m"
+#define CYN   "\x1B[36m"
+#define WHT   "\x1B[37m"
+#define RESET "\x1B[0m"
+#define MAXLINE 1000
 
 pthread_mutex_t mutex;
 
@@ -38,8 +46,8 @@ int menuplay(){
 		printf("\n************************************\n");
 		printf("\tMenu play\n");
 		printf("\t1. Change password.\n");
-		printf("\t2. Choose mode offline.\n");
-		printf("\t3. Choose mode online.\n");
+		printf("\t2. Choose mode online.\n");
+		printf("\t3. Choose mode offline.\n");
 		printf("\t4. Log out.\n");
 		printf("\t5. Exit.\n");
 		scanf(" %[^\n]", input);
@@ -143,7 +151,7 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+											printf("%s: ", recvBuff);
 											scanf(" %[^\n]", str);
 											send(sockfd , str , strlen(str) , 0 );
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
@@ -155,8 +163,63 @@ int main() {
 								    	    recvBuff[recvBytes] = '\0';
 								    	    printf("%s\n", recvBuff);
 										break;
+							// choose mode offline
+										case 3:
+											while(1) {
+												recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+												if (recvBytes == 0) {
+									    	    	perror("The server terminated prematurely");
+									    	    	exit(4);
+									    	    	return 0;
+												}
+												recvBuff[recvBytes] = '\0';
+								    	    	//printf("%s", recvBuff);
+												printf(CYN "%s: " RESET, recvBuff);
+												//printf(WHT "white\n"   RESET);
+												//printf(RED "red\n"     RESET);
+												// printf(GRN "green\n"   RESET);
+												// printf(YEL "yellow\n"  RESET);
+												// printf(BLU "blue\n"    RESET);
+												// printf(MAG "magenta\n" RESET);
+												// printf(CYN "cyan\n"    RESET);
+												if(strstr(recvBuff, "Sai! Đáp án đúng là") == NULL && strstr(recvBuff, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL) {
+													do {
+														scanf(" %[^\n]", str);
+														int answer = 0;
+														if (strcmp(str, "A") == 0) {
+															answer = 1;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "B") == 0) {
+															answer = 2;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "C") == 0) {
+															answer = 3;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "D") == 0) {
+															answer = 4;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (strcmp(str, "H") == 0) {
+															answer = 5;
+															sprintf(str,"%d", answer);
+															send(sockfd , str , strlen(str) , 0 );
+														}
+														if (answer == 0) sprintf(str,"%d", answer);
+														if (strcmp(str, "0") == 0) printf("Đáp án của bạn: ");
+													} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0 && strcmp(str, "5") != 0);
+												} else break;
+									    	}
+										break;
+							// choose mode online
 										case 2:
-										do{
+										while(1){
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
 									    	    perror("The server terminated prematurely");
@@ -164,15 +227,29 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
+								    	    printf(CYN "%s: " RESET, recvBuff);
+								    	    printf("Your answer: \n");
 								    	    clock_t begin = clock();
-								    	    printf("%s: ", recvBuff);
-								    	    do{
-								    	   		scanf(" %[^\n]", input);
-	    										if (strlen(input) != 1 || !isdigit(input[0])) break;
-	    										answer = atoi(input);
-	    										if(answer <= 4 && answer >=1)
-	    											send(sockfd,input,strlen(input), 0);
-	    									}while(answer > 4 || answer <1);
+    										do {
+												scanf(" %[^\n]", str);
+												int answer = 0;
+												if (strcmp(str, "A") == 0) {
+													answer = 1;
+												}
+												else if (strcmp(str, "B") == 0) {
+													answer = 2;
+												}
+												else if (strcmp(str, "C") == 0) {
+													answer = 3;
+												}
+												else if (strcmp(str, "D") == 0) {
+													answer = 4;
+												}
+												else printf("Đáp án của bạn: ");
+												sprintf(str,"%d", answer);
+												send(sockfd , str , strlen(str) , 0 );
+												if (answer == 0) sprintf(str,"%d", answer);
+											} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0 );
 	    									clock_t end = clock();
 	    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
 	    									sprintf(input,"%f", time_answer);
@@ -181,12 +258,9 @@ int main() {
 	    									if(strcmp(recvBuff,"Your answer is correct.") == 0){
 		    									send(sockfd,input, strlen(input), 0);
 		    								}
-	    								}while(strcmp(recvBuff,"Incorrect") != 0);
-
+		    							}
 										break;
-										case 3:
-
-										break;
+							// log out
 										case 4:
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
@@ -196,7 +270,6 @@ int main() {
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
 								    	    printf("%s\n", recvBuff);
-
 										break;
 										default: return 0;
 									}
@@ -218,7 +291,7 @@ int main() {
 			case 3:
 			break;
 			case 4:
-				printf("--------------------------\n");
+				printf("*********Credit*********\n");
 				printf("1. Nguyen Thi Thuy Linh\n");
 				printf("2. Luong Duc Minh\n");
 				printf("3. Nguyen Thanh Ha\n");
@@ -226,4 +299,6 @@ int main() {
 			default: break;
 		}
 	}while (op != 5);
+	return 0;
 }
+
