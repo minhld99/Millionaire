@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <ctype.h>
+#include <time.h>
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
 #define YEL   "\x1B[33m"
@@ -81,7 +82,7 @@ int main() {
     char ser_address[MAXLINE] = {0};
     // menu
 	int op, op_play;
-	char str[MAXLINE] = {0};
+	char str[MAXLINE] = {0}, *input;
 	do{
 		op = menu();
 		switch(op){
@@ -117,7 +118,7 @@ int main() {
 				    while(fgets( sendBuff, MAXLINE, stdin) != NULL){
 				        char *tmp = strstr(sendBuff, "\n");
 				        if(tmp != NULL) *tmp = '\0';
-				        int check = 0;
+				        int check = 0, count, answer;
 				        for(int i = 0; i < strlen(sendBuff); i ++){
 				            if(sendBuff[i] != ' ' && sendBuff[i] != '\0'){
 				                check = 1;
@@ -218,6 +219,7 @@ int main() {
 										break;
 							// choose mode online
 										case 2:
+										while(1){
 											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
 									    	if (recvBytes == 0) {
 									    	    perror("The server terminated prematurely");
@@ -225,7 +227,38 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+								    	    printf(CYN "%s: " RESET, recvBuff);
+								    	    printf("Your answer: \n");
+								    	    clock_t begin = clock();
+    										do {
+												scanf(" %[^\n]", str);
+												int answer = 0;
+												if (strcmp(str, "A") == 0) {
+													answer = 1;
+												}
+												else if (strcmp(str, "B") == 0) {
+													answer = 2;
+												}
+												else if (strcmp(str, "C") == 0) {
+													answer = 3;
+												}
+												else if (strcmp(str, "D") == 0) {
+													answer = 4;
+												}
+												else printf("Đáp án của bạn: ");
+												sprintf(str,"%d", answer);
+												send(sockfd , str , strlen(str) , 0 );
+												if (answer == 0) sprintf(str,"%d", answer);
+											} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0 );
+	    									clock_t end = clock();
+	    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
+	    									sprintf(input,"%f", time_answer);
+	    									printf("Time: %f\n", time_answer);
+	    						//fix here
+	    									if(strcmp(recvBuff,"Your answer is correct.") == 0){
+		    									send(sockfd,input, strlen(input), 0);
+		    								}
+		    							}
 										break;
 							// log out
 										case 4:
@@ -236,7 +269,7 @@ int main() {
 									    	    return 0;
 									    	}
 								    	    recvBuff[recvBytes] = '\0';
-								    	    printf("%s: ", recvBuff);
+								    	    printf("%s\n", recvBuff);
 										break;
 										default: return 0;
 									}
@@ -266,4 +299,6 @@ int main() {
 			default: break;
 		}
 	}while (op != 5);
+	return 0;
 }
+
