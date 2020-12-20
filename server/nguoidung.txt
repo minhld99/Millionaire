@@ -1,3 +1,6 @@
-hust hust123 3
+hust hust123 1
 soict soictfit 0
-test test123 3
+test test123 1
+minh minh123 1
+ha ha123 1
+linh linh123 1
