@@ -1,14 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h> // bzero()
 #include <ctype.h> // isdigit(), isalpha()
 #include <sys/socket.h> // listen(), accept()
 #include <netinet/in.h>
 #include <arpa/inet.h> // inet_ntoa(), inet_aton()
-#include <unistd.h> // close(sockfd)
+#include <unistd.h> // close(sockfd), time_t
 #include <pthread.h>
 #include <errno.h> 
 #include <time.h> // rand()
+#include <sqlite3.h>
 
 #define BUFF_SIZE 1000
 #define TRUE 1
@@ -27,7 +29,7 @@
 struct user {
     char username[BUFF_SIZE];
     char password[BUFF_SIZE];
-    int status; // 0 (blocked), 1 (active), 2 (idle)
+    int status; // 0 (blocked), 1 (active), 2 (idle), 3 (online)
     int count; // // number of times of wrong-password's typing
     struct user *next;
 };
@@ -58,11 +60,29 @@ struct level {
 };
 struct level questionBank[15];
 
-char online_user[BUFF_SIZE]; // Who are online?
+// struct game {
+//     struct client *players;
+//     struct game *next;
+//     int status; // 1: idle - waiting, 2: active - playing
+// };
+
+struct game {
+    int room[BUFF_SIZE][BUFF_SIZE]; // room[index][client_sockfd]
+    int room_status[BUFF_SIZE]; // room status
+    int room_size[BUFF_SIZE]; // number of player in room
+    int count; // number of game
+    int main_player[BUFF_SIZE]; // main player of each room
+    int answer[BUFF_SIZE][BUFF_SIZE]; // answer of each player
+    double answer_time[BUFF_SIZE][BUFF_SIZE]; // time for answering of each player
+    int true_answer[BUFF_SIZE]; // đáp án cho câu hỏi phụ ở mỗi phòng
+};
+struct game Game = {0};
+
 pthread_mutex_t mutex;
 
 /* ---------------- Function Declaration ---------------- */
 
+void catch_ctrl_c_and_exit(int sig);
 void init();
 struct user *newAccount();
 struct client *newClient();
@@ -73,56 +93,44 @@ void addQuestion(int index, int level, char question[BUFF_SIZE], char answerA[BU
 void addClient(int connfd);
 void addAccount(char username[BUFF_SIZE], char password[BUFF_SIZE], int status);
 void deleteClient(int connfd);
-
+int addPlayer2Game(int connfd);
+void resetGameRoom(int room_number, int exit_player);
 void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status);
 void changeClientAccount(char account[BUFF_SIZE], int connfd);
 int is_empty(const char *s);
 int is_number(const char *s);
 void *loginSession(void *client_sock);
-void send_to_others(char *mesg, int curr);
+void send_to_others(char *mesg, int current_player, int room_number);
 
 /* -------------------------- Main Function -------------------------- */
 int main(int argc, char **argv) {
     if (argc < 2) {
-        printf("error: too few arguments, expected 2, have %d\n", argc);
-        printf("Usage:\t%s PortNumber\n (For example: %s 5500)\n", argv[0], argv[0]);
+        printf("\nerror: too few arguments, expected 2, have %d\n", argc);
+        printf("Usage:\t%s PortNumber\n (For example: %s 5500)\n\n", argv[0], argv[0]);
         exit(-1);
     }
     else if (argc > 2) {
-        printf("error: too many arguments, expected 2, have %d\n", argc);
-        printf("Usage:\t%s PortNumber\n (For example: %s 5500)\n", argv[0], argv[0]);
+        printf("\nerror: too many arguments, expected 2, have %d\n", argc);
+        printf("Usage:\t%s PortNumber\n (For example: %s 5500)\n\n", argv[0], argv[0]);
         exit(-1);
     }
 
     if ((!is_number(argv[1])) || atoi(argv[1]) > 65535 || atoi(argv[1]) < 0) {
-        printf("Invalid port number\n");
+        printf("Invalid port number\n\n");
         exit(-1);
     }
 
     init();
     readUserFILE();
     readQuestionFILE();
-    int listenfd, connfd, n, client_socket[max_clients], opt = TRUE, activity, i, j, k, rc, maxfd, current_size = 0;
+    signal(SIGINT, catch_ctrl_c_and_exit);
+
+    int listenfd, connfd, n, opt = TRUE; 
     const unsigned short SERV_PORT = atoi(argv[1]);
     char buff[BUFF_SIZE] = {0};
     struct sockaddr_in cliaddr, servaddr;
     pthread_t recvt;
-    pid_t childpid;
     socklen_t clilen;
-    fd_set readfds;
-    // struct timeval timeout;
-
-    // for (i = 0; i < 15; i++) {
-    //     for (j = 0; j < 10; j++) {
-    //         printf("(%s)\n(%s)\n(%s)\n(%s)\n(%s)\n(%d)\n", 
-    //         questionBank[i].questions[j].question, 
-    //         questionBank[i].questions[j].answerA, 
-    //         questionBank[i].questions[j].answerB, 
-    //         questionBank[i].questions[j].answerC, 
-    //         questionBank[i].questions[j].answerD, 
-    //         questionBank[i].questions[j].true);
-    //     }
-    // }
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0); //Socket file descriptor used to identify the socket
     if (listenfd < 0) {
@@ -131,11 +139,9 @@ int main(int argc, char **argv) {
     }
 
     servaddr.sin_family = AF_INET;
-    // servaddr.sin_addr.s_addr = inet_addr("192.168.100.15"); // Minh's macbook internal ipv4 address
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // For running on local
+    servaddr.sin_addr.s_addr = inet_addr("192.168.100.15"); // Minh's macbook internal ipv4 address
+    // servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // For running on local
     servaddr.sin_port = htons(SERV_PORT);
-
-    for (i = 0; i < max_clients; i++) client_socket[i] = -1;
 
     // Allow socket descriptor to be reuseable
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (char *) &opt, sizeof(opt)) < 0) {
@@ -156,88 +162,39 @@ int main(int argc, char **argv) {
         close(listenfd);
         exit(-1);
     }
+
     clilen = sizeof(cliaddr);
     printf("Waiting for connections ...\n");
 
     for(;;) {
-        // clear the socket set
-        FD_ZERO(&readfds);
-
-        // add master socket to set
-        FD_SET(listenfd, &readfds);
-        maxfd = listenfd;
-
-        // add child sockets to set
-        for (i = 0 ; i < max_clients ; i++) {   
-			//if valid socket descriptor then add to read list
-			if(client_socket[i] > 0) FD_SET(client_socket[i], &readfds);
-            
-            //highest file descriptor number, need it for the select function
-            if(client_socket[i] > maxfd) maxfd = client_socket[i];;
+        if ((connfd = accept(listenfd, (struct sockaddr *)&cliaddr, &clilen)) < 0) {
+            perror("Connect error");
+            continue;
         }
-
-        // timeout.tv_sec = 3;
-        // timeout.tv_usec = 500000; // (microsecond) = 0.5s
-
-        // wait for an activity on one of the sockets , timeout is NULL , so wait indefinitely
-        activity = select(maxfd+1, &readfds, NULL, NULL, NULL);
-   
-        if ((activity < 0) && (errno!=EINTR)) printf("select error");
-
-        // If something happened on the master socket , then its an incoming connection
-        if (FD_ISSET(listenfd, &readfds)) {
-            if ((connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen)) < 0) {
-                perror("accept");
-                exit(EXIT_FAILURE);
-            }
-         
-            // inform user of socket number - used in send and receive commands
-            printf("New connection from [%s:%d] - (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
-            current_size++;
-             
-            // add new socket to array of sockets
-            for (i = 0; i < max_clients; i++) {
-                // if position is empty
-				if(client_socket[i] == -1) {
-                    client_socket[i] = connfd;
-                    printf("Adding to list of sockets as %d\n", i);
-                    addClient(connfd);
-					break;
-                }
-            }
-        }
-        // else its some IO operation on some other socket
-        for (i = 0; i < current_size; i++) {
-            if (FD_ISSET(client_socket[i], &readfds)) {
-                // Check if it was for closing , and also read the incoming message
-                printf("--------------\n");
-                printf("Message from Socket[%d]...\n", client_socket[i]);
-                if ((rc = read(client_socket[i], buff, sizeof(buff))) == 0) {
-                    // Somebody disconnected , get his details and print
-                    printf("Host disconnected: socket_fd(%d)\n", client_socket[i]);
-                    
-                    // Close the socket and mark as 0 in list for reuse
-                    close(client_socket[i]);
-                    deleteClient(client_socket[i]);
-                    client_socket[i] = -1;
-                    current_size--;
-                }
-                
-                // Echo back
-                else {
-                    // pthread_mutex_lock(&mutex);
-                    pthread_create(&recvt, NULL, loginSession, &client_socket[i]);
-                    pthread_join(recvt, NULL); //thread is closed
-                    // pthread_mutex_unlock(&mutex);
-                }
-            }
-        }
+        printf("--------------\n");
+        printf("New connection from [%s:%d] - (%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
+        addClient(connfd);
+        pthread_mutex_lock(&mutex);
+        pthread_create(&recvt, NULL, loginSession, &connfd);
+        // pthread_join(recvt, NULL); //thread is closed
+        pthread_mutex_unlock(&mutex);
     }
-    // close(listenfd); // close listening socket
+    close(listenfd); // close listening socket
     return 0; 
 }
 
 /* -------------------------- Utilities --------------------------- */
+
+void catch_ctrl_c_and_exit(int sig) {
+    char mesg[] = "\nServer is closing...\n";
+    while (client1 != NULL) {
+        send(client1->connfd, mesg, strlen(mesg), 0);
+        printf("\nClose socketfd: %d\n", client1->connfd);
+        deleteClient(client1->connfd);
+    }
+    printf("\nBye\n");
+    exit(EXIT_SUCCESS);
+}
 
 // Create account's text file
 void init() {
@@ -245,6 +202,9 @@ void init() {
     fprintf(f, "hust hust123 1\n");
     fprintf(f, "soict soictfit 0\n");
     fprintf(f, "test test123 1\n");
+    fprintf(f, "minh minh123 1\n");
+    fprintf(f, "ha ha123 1\n");
+    fprintf(f, "linh linh123 1\n");
     fclose(f);
 }
 
@@ -263,6 +223,102 @@ struct client *newClient() {
     retVal->next = NULL;
     retVal->login_status = 0;
     return retVal;
+}
+
+int addPlayer2Game(int connfd) {
+    int room_entered = -1;
+    for (int i = 0; i < Game.count+1; i++) {
+        if (Game.room_status[i] == 1) {
+            Game.room[i][Game.room_size[i]] = connfd;
+            Game.room_size[i]++;
+            room_entered = i;
+        }
+    }
+    if (room_entered == -1) {
+        for (int i = 0; i < BUFF_SIZE; i++) {
+            if (Game.room_status[i] == 0) {
+                Game.count++;
+                Game.room_status[i] = 1;
+                Game.room[i][0] = connfd;
+                Game.room_size[i]++;
+                time_t endwait;
+                time_t start = time(NULL);
+                time_t seconds = 10; // end loop after this time has elapsed
+
+                endwait = start + seconds;
+
+                printf("start time is: %s", ctime(&start));
+
+                while (start < endwait)
+                {
+                    if (Game.room_size[i] >= 2) room_entered = i;
+                    else room_entered = -1;
+                    sleep(1);   // sleep 1s.
+                    start = time(NULL);
+                    printf("loop time is: %s", ctime(&start));
+                }
+                printf("end time is: %s", ctime(&endwait));
+
+                if (Game.room_size[i] < 2) { // reset
+                    Game.room_status[i] = 0;
+                    Game.room[i][0] = 0;
+                    Game.room_size[i]--;
+                    Game.count--;
+                }
+                else Game.room_status[i] = 2;
+                break;
+            }
+        }
+    }
+
+    return room_entered;
+}
+
+int chooseMainPlayer(int room_number, int true_answer) {
+    double max = 30;
+    int mainPlayer = 0;
+    for (int i = 0; i < Game.room_size[room_number]; i++) {
+        if (Game.answer[room_number][i] == true_answer) {
+            if (Game.answer_time[room_number][i] < max) {
+                max = Game.answer_time[room_number][i];
+                mainPlayer = Game.room[room_number][i];
+            }
+        }
+    }
+    if (max == 30) {
+        for (int i = 0; i < Game.room_size[room_number]; i++) {
+            if (Game.answer_time[room_number][i] < max) {
+                max = Game.answer_time[room_number][i];
+                mainPlayer = Game.room[room_number][i];
+            }
+        }
+    }
+    printf("Main Player: %d\n", mainPlayer);
+    return mainPlayer;
+}
+
+void resetGameRoom(int room_number, int exit_player) {
+    if (exit_player == -1) {
+        Game.room_status[room_number] = 0;
+        memset(Game.room[room_number], 0, Game.count*sizeof(*Game.room[room_number]));
+        Game.main_player[room_number] = 0;
+        Game.room_size[room_number]--;
+        memset(Game.answer[room_number], 0, Game.count*sizeof(*Game.answer[room_number]));
+        memset(Game.answer_time[room_number], 0, Game.count*sizeof(*Game.answer_time[room_number]));
+        Game.true_answer[room_number] = 0;
+        Game.count--;
+        return;
+    }
+    int number_of_player = Game.room_size[room_number];
+    for (int i = 0; i < number_of_player; i++) {
+        if (Game.room[room_number][i] == exit_player) {
+            Game.room[room_number][i] = Game.room[room_number][number_of_player-1];
+            Game.room[room_number][number_of_player-1] = 0;
+            Game.room_size[room_number]--;
+            Game.answer[room_number][i] = 0;
+            Game.answer_time[room_number][i] = 0;
+        }
+    }
 }
 
 // Read from file into linked list
@@ -319,7 +375,6 @@ void readQuestionFILE() {
             if (offset != NULL) *offset = '\0';
             int true = atoi(str);
             addQuestion(j, i+1, question, answerA, answerB, answerC, answerD, true);
-            // printf("%s\nA. %s\nB. %s\nC. %s\nD. %s\n", question, answerA, answerB, answerC, answerD);
         }
     }
     fclose(f);
@@ -383,8 +438,9 @@ void deleteClient(int connfd) {
     if (temp == NULL) return; 
     // Unlink the node from linked list 
     prev->next = temp->next; 
-    free(temp);  // Free memory 
-} 
+    free(temp);  // Free memory
+    close(connfd);
+}
 
 // Change password or change status and save to file
 void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_status) {
@@ -397,8 +453,8 @@ void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_stat
     while (tmp != NULL) {  
         if (strcmp(tmp->username, name) == 0) {
             // memcpy(tmp->password, new_pass, BUFF_SIZE);
-            strcpy(tmp->password, new_pass);
-            if (new_status != 3) tmp->status = new_status;
+            if (strcmp(new_pass, "") != 0) strcpy(tmp->password, new_pass);
+            if (new_status != 4) tmp->status = new_status;
         }
         fprintf(f, "%s %s %d\n", tmp->username, tmp->password, tmp->status);
         tmp = tmp->next;
@@ -411,7 +467,6 @@ void changeClientAccount(char account[BUFF_SIZE], int connfd) {
     struct client *tmp = client1;
     while (tmp != NULL) {  
         if (tmp->connfd == connfd) {
-            // memcpy(tmp->login_account, account, BUFF_SIZE);
             strcpy(tmp->login_account, account);
         }
         tmp = tmp->next;
@@ -439,25 +494,33 @@ int is_number(const char *s) {
 void *loginSession(void *client_sock) {
 	int connfd = *((int *)client_sock);
     char buff[BUFF_SIZE] = {0};
+    struct client *cli = client1;
+    while (cli->connfd != connfd && cli != NULL) cli = cli->next;
 	int n;
     strcpy(buff, "Enter username: ");
     send(connfd, buff, strlen(buff), 0);
 	while((n = recv(connfd, buff, BUFF_SIZE, 0)) > 0) {
-        struct client *cli = client1;
-        while (cli->connfd != connfd && cli != NULL) cli = cli->next;
         char mesg[BUFF_SIZE] = {0};
         buff[n] = '\0';
-        printf(CYN "[%d]: %s\n" RESET, connfd, buff);
         if (cli->login_status == 0) {
+            printf(CYN "[%d]: %s\n" RESET, connfd, buff);
             struct user *tmp = head;
             while (tmp != NULL) {
                 if (strcmp(tmp->username, buff) == 0) {
                     strcpy(mesg, "Insert password: ");
                     send(connfd, mesg, strlen(mesg), 0);
                     n = recv(connfd, buff, BUFF_SIZE, 0);
-                    if (n < 0) {
+                    if (n == 0) {
+                        printf("Host disconnected: socket_fd(%d)\n", connfd);
+                        close(connfd);
+                        deleteClient(connfd);
+                        return NULL;
+                    }
+                    else if (n < 0) {
                         perror("Read error");
-                        exit(1);
+                        close(connfd);
+                        deleteClient(connfd);
+                        return NULL;
                     }
                     buff[n] = '\0';
                     printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
@@ -466,12 +529,16 @@ void *loginSession(void *client_sock) {
                             strcpy(mesg, "account not ready");
                             send(connfd, mesg, strlen(mesg), 0);
                         } 
+                        if (tmp->status == 3) {
+                            strcpy(mesg, "Error! Account is online in another device.\nEnter username: ");
+                            send(connfd, mesg, strlen(mesg), 0);
+                        }
                         else {
                             tmp->count = 1;
                             strcpy(mesg, "OK");
+                            updateUserFILE(tmp->username, "", 3);
                             changeClientAccount(tmp->username, connfd);
                             send(connfd, mesg, strlen(mesg), 0);
-                            strcpy(online_user, tmp->username);
                             cli->login_status = 1;
                         }
                     }
@@ -490,7 +557,7 @@ void *loginSession(void *client_sock) {
                     }
                     break;
                 }
-                tmp = tmp->next;  
+                tmp = tmp->next;
             }
             if (tmp == NULL) {
                 strcpy(mesg, "Wrong account! Please register first.");
@@ -499,25 +566,28 @@ void *loginSession(void *client_sock) {
             }
         }
         else if (cli->login_status == 1) {
+            printf(CYN "[%d - %s]: %s\n" RESET, connfd, cli->login_account, buff);
             // receive new password
-            if (strcmp(buff, "bye") == 0) {
-                strcpy(mesg, "Goodbye ");
-                strcat(mesg, online_user);
-                changeClientAccount("", connfd);
-                cli->login_status = 0;
-                strcpy(online_user, "");
-                send(connfd, mesg, strlen(mesg), 0);
-                continue;
-            }
-            else if (strcmp(buff, "1") == 0) {
+            if (strcmp(buff, "1") == 0) {
                 strcpy(mesg, "Enter new password");
                 send(connfd, mesg, strlen(mesg), 0);
-                if ((n = recv(connfd, buff, BUFF_SIZE, 0)) < 0) {
+                n = recv(connfd, buff, BUFF_SIZE, 0);
+                if (n == 0) {
+                    printf("Host disconnected: socket_fd(%d)\n", connfd);
+                    updateUserFILE(cli->login_account, "", 1);
+                    close(connfd);
+                    deleteClient(connfd);
+                    break;
+                }
+                else if (n < 0) {
                     perror("Read error");
-                    exit(1);
+                    updateUserFILE(cli->login_account, "", 1);
+                    close(connfd);
+                    deleteClient(connfd);
+                    break;    
                 }
                 buff[n] = '\0';
-                printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
+                printf(CYN "[%d - %s]: %s\n" RESET, cli->connfd, cli->login_account, buff);
                 int alphabet = 0, number = 0, i; 
                 char alpha[BUFF_SIZE] = {0}, digit[BUFF_SIZE] = {0}; 
                 for (i=0; buff[i]!= '\0'; i++) { 
@@ -539,16 +609,248 @@ void *loginSession(void *client_sock) {
                     }
                 }
                 if (alphabet != 0 || number != 0) {
-                    strcpy(mesg, digit);
+                    strcpy(mesg, "Password changed succesfully! Encrypted password: ");
+                    strcat(mesg, digit);
                     strcat(mesg, alpha);
                     send(connfd, mesg, strlen(mesg), 0);
-                    updateUserFILE(online_user, buff, 3); // 3 ~ keep the current status
-                    send_to_others(buff, connfd);
+                    updateUserFILE(cli->login_account, buff, 4); // 4 ~ keep the current status
                 }
             }
-            else if (strcmp(buff, "2") == 0) {
-                strcpy(mesg, "You choose mode online");
+            else if (strcmp(buff, "2") == 0) { // 1 player, n spectators
+                strcpy(mesg, "Đang kiểm tra, chờ chút...\n");
                 send(connfd, mesg, strlen(mesg), 0);
+                int room_entered = addPlayer2Game(connfd);
+                Game.main_player[room_entered] = 0; // uid_socketfd of main player
+                if (room_entered == -1) {
+                    sprintf(mesg, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
+                    printf(CYN "%s\n" RESET, mesg);
+                    strcpy(mesg, "Không đủ người chơi online. Hãy thử lại sau!");
+                    send(connfd, mesg, strlen(mesg), 0);
+                    continue;
+                }
+                else {
+                    while (1) if (Game.room_status[room_entered] == 2) break;
+                    sprintf(mesg, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
+                    printf(CYN "%s\n" RESET, mesg);
+                    sprintf(mesg, "[Phòng %d] Ghép cặp thành công. Bắt đầu!", room_entered);
+                    send(connfd, mesg, strlen(mesg), 0);
+                }
+                // Choose main player
+                sqlite3 *db;
+                char *err_msg = 0;
+                sqlite3_stmt *res;
+                int rc = sqlite3_open("Question", &db);
+                if (rc != SQLITE_OK) {
+                    fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+                    sqlite3_close(db);
+                    continue;
+                }
+                if (connfd != Game.room[room_entered][0]) {
+                    char sql[BUFF_SIZE];
+                    sprintf(sql, "SELECT * FROM Question ORDER BY RANDOM() LIMIT 1");
+                    rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+                    if (rc != SQLITE_OK) {  
+                        fprintf(stderr, "Failed to select data\n");
+                        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+                        sqlite3_close(db);
+                        continue;
+                    }
+                    int step = sqlite3_step(res);
+                    if (step == SQLITE_ROW) { 
+                        sprintf(mesg, "Câu hỏi phụ: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ",
+                        sqlite3_column_text(res, 0),
+                        sqlite3_column_text(res, 3),
+                        sqlite3_column_text(res, 4),
+                        sqlite3_column_text(res, 5),
+                        sqlite3_column_text(res, 6));
+                        // send(connfd, mesg, strlen(mesg), 0);
+                        send_to_others(mesg, -1, room_entered);
+                        printf("%s\n", mesg);
+                        Game.true_answer[room_entered] = atoi((char *)sqlite3_column_text(res, 7));
+                    }
+                }
+                n = recv(connfd, buff, BUFF_SIZE, 0);
+                if (n == 0) {
+                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    if (Game.room_size[room_entered] > 2) {
+                        send_to_others(mesg, connfd, room_entered);
+                        resetGameRoom(room_entered, connfd);
+                    }
+                    else {
+                        strcat(mesg, "\nKhông đủ ít nhất 2 người. Mode online kết thúc!");
+                        send_to_others(mesg, connfd, room_entered);
+                        printf("[Room %d]: %s\n", room_entered, mesg);
+                        resetGameRoom(room_entered, -1);
+                    }
+                    printf("Host disconnected: socket_fd(%d)\n", connfd);
+                    updateUserFILE(cli->login_account, "", 1);
+                    close(connfd);
+                    deleteClient(connfd);
+                    break;
+                }
+                else if (n < 0) {
+                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    if (Game.room_size[room_entered] > 2) {
+                        send_to_others(mesg, connfd, room_entered);
+                        resetGameRoom(room_entered, connfd);
+                    }
+                    else {
+                        strcat(mesg, "\nKhông đủ ít nhất 2 người. Mode online kết thúc!");
+                        send_to_others(mesg, connfd, room_entered);
+                        printf("[Room %d]: %s\n", room_entered, mesg);
+                        resetGameRoom(room_entered, -1);
+                    }
+                    perror("Read error");
+                    updateUserFILE(cli->login_account, "", 1);
+                    close(connfd);
+                    deleteClient(connfd);
+                    break;
+                }
+                buff[n] = '\0';
+                sprintf(mesg,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
+                printf(CYN "%s" RESET, mesg);
+                char *answer = strtok(buff, " ");
+                double time = atof(strtok(NULL, " "));
+    
+                if (atoi(answer) == Game.true_answer[room_entered]) {
+                    strcpy(mesg, "Chính xác!\nChờ kết quả từ chương trình...");
+                }
+                else sprintf(mesg, "Sai! Đáp án đúng là %d\nChờ kết quả từ chương trình...\n", Game.true_answer[room_entered]);
+                send(connfd, mesg, strlen(mesg), 0);
+                printf("@[%d - %s]: %s", cli->connfd, cli->login_account, mesg);
+                
+                while (1) {
+                    int loop = 0;
+                    for (int j = 0; j < Game.room_size[room_entered]; j++) {
+                        if (Game.room[room_entered][j] == connfd) {
+                            Game.answer[room_entered][j] = atoi(answer);
+                            Game.answer_time[room_entered][j] = time;
+                        }
+                        else if (Game.answer[room_entered][j] == 0) {
+                            loop = 1;
+                            break;
+                        }
+                    }
+                    if (loop == 1) continue;
+                    break;
+                }
+                Game.main_player[room_entered] = chooseMainPlayer(room_entered, Game.true_answer[room_entered]);
+
+                // Main player only
+                if (connfd != Game.main_player[room_entered]) {
+                    while (1) if (Game.room_status[room_entered] == 0) break;
+                    n = recv(connfd, buff, BUFF_SIZE, 0);
+                    if (n == 0) {
+                        sprintf(mesg, "Người xem [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                        send_to_others(mesg, connfd, room_entered);
+                        resetGameRoom(room_entered, connfd);
+                        printf("Host disconnected: socket_fd(%d)\n", connfd);
+                        updateUserFILE(cli->login_account, "", 1);
+                        close(connfd);
+                        deleteClient(connfd);
+                        break;
+                    }
+                    else if (n < 0) {
+                        sprintf(mesg, "Người xem [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                        send_to_others(mesg, connfd, room_entered);
+                        resetGameRoom(room_entered, connfd);
+                        perror("Read error");
+                        updateUserFILE(cli->login_account, "", 1);
+                        close(connfd);
+                        deleteClient(connfd);
+                        break;
+                    }
+                    continue;
+                }
+                else {
+                    struct client *tmp = client1;
+                    while (tmp->connfd != Game.main_player[room_entered] && tmp != NULL) tmp = tmp->next;
+                    sprintf(mesg, "Người chơi: " CYN "%s" RESET "\nKhán giả:", tmp->login_account);
+                    for (int j = 0; j < Game.room_size[room_entered]; j++) {
+                        char str[BUFF_SIZE] = {0};
+                        tmp = client1;
+                        if (Game.room[room_entered][j] != Game.main_player[room_entered]) {
+                            while (tmp->connfd != Game.room[room_entered][j] && tmp != NULL) tmp = tmp->next;
+                            sprintf(str, CYN " %s" RESET, tmp->login_account);
+                            strcat(mesg, str);
+                        }
+                    }
+                    strcat(mesg, "\n");
+                    send_to_others(mesg, -1, room_entered);
+                    
+                    int i;
+                    for (i = 0; i < 15; i++) {
+                        char sql[BUFF_SIZE];
+                        sprintf(sql, "SELECT * FROM Question%d ORDER BY RANDOM() LIMIT 1", i+1);
+                        rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+                        if (rc != SQLITE_OK) {  
+                            fprintf(stderr, "Failed to select data\n");
+                            fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+                            sqlite3_close(db);
+                            continue;
+                        }
+                        int step = sqlite3_step(res);
+                        if (step == SQLITE_ROW) { 
+                            char tmp[BUFF_SIZE] = {0};      
+                            sprintf(tmp, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
+                            sqlite3_column_text(res, 1),
+                            sqlite3_column_text(res, 2),
+                            sqlite3_column_text(res, 3),
+                            sqlite3_column_text(res, 4),
+                            sqlite3_column_text(res, 5));
+                            // printf("%s\n", mesg);
+                            // if (i == 0) send_to_others(mesg, -1, room_entered);
+                            if (i > 1) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                            else strcpy(mesg, tmp);
+                            send_to_others(mesg, -1, room_entered);
+                        }
+                        n = recv(connfd, buff, BUFF_SIZE, 0);
+                        if (n == 0) {
+                            sprintf(mesg, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                            send_to_others(mesg, connfd, room_entered);
+                            printf("[Room %d]: %s\n", room_entered, mesg);
+                            resetGameRoom(room_entered, -1);
+                            printf("Host disconnected: socket_fd(%d)\n", connfd);
+                            updateUserFILE(cli->login_account, "", 1);
+                            close(connfd);
+                            deleteClient(connfd);
+                            break;
+                        }
+                        else if (n < 0) {
+                            sprintf(mesg, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                            send_to_others(mesg, connfd, room_entered);
+                            printf("[Room %d]: %s\n", room_entered, mesg);
+                            resetGameRoom(room_entered, -1);
+                            perror("Read error");
+                            updateUserFILE(cli->login_account, "", 1);
+                            close(connfd);
+                            deleteClient(connfd);
+                            break;
+                        }
+                        buff[n] = '\0';
+                        sprintf(mesg,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
+                        printf(CYN "%s" RESET, mesg);
+                        send_to_others(mesg, connfd, room_entered);
+                        char *answer = strtok(buff, " ");
+                        if (strcmp(answer, (char *)sqlite3_column_text(res, 6)) != 0) {
+                            sprintf(mesg, "Sai! Đáp án đúng là %s\n", sqlite3_column_text(res, 6));
+                            printf("%s\n", mesg);
+                            send_to_others(mesg, -1, room_entered);
+                            break;
+                        }
+                    }
+                    if (i == 15) {
+                        strcpy(mesg, "\nChúc mừng bạn đã trả lời đúng 15 câu hỏi!\n\n");
+                        printf("%s\n", mesg);
+                        send_to_others(mesg, -1, room_entered);
+                    }
+                    sqlite3_finalize(res);
+                    sqlite3_close(db);
+                }
+                resetGameRoom(room_entered, -1);
+                for (int j = 0; j <= Game.room_size[room_entered]; j++) {
+                    printf("%d\n", Game.room[room_entered][j]);
+                }
             }
             else if (strcmp(buff, "3") == 0) {
                 // strcpy(mesg, "You choose mode offline");
@@ -574,26 +876,30 @@ void *loginSession(void *client_sock) {
                     else if (i != 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
                     else strcpy(mesg, tmp);
                     printf("%s\n", mesg);
-                    if (send(connfd, mesg, strlen(mesg), 0) == -1) {
-                        // printf("Host disconnected: socket_fd(%d)\n", client_socket[i]);
+                    if (send(connfd, mesg, strlen(mesg), 0) == -1) break;
+                    n = recv(connfd, buff, BUFF_SIZE, 0);
+                    if (n == 0) {
+                        printf("Host disconnected: socket_fd(%d)\n", connfd);
+                        updateUserFILE(cli->login_account, "", 1);
+                        close(connfd);
+                        deleteClient(connfd);
                         break;
                     }
-                    if ((n = recv(connfd, buff, BUFF_SIZE, 0) > 0)) {
-                        buff[n] = '\0';
-                        printf(CYN "[%d]: %s\n" RESET, connfd, buff);
-                        if (atoi(buff) == 5) {
-
-                        }
-                        else if (atoi(buff) != questionBank[i].questions[j].true) {
-                            sprintf(mesg, "Sai! Đáp án đúng là %d\n", questionBank[i].questions[j].true);
-                            printf("%s\n", mesg);
-                            send(connfd, mesg, strlen(mesg), 0);
-                            break;
-                        }
-                    } 
                     else if (n < 0) {
                         perror("Read error");
-                        exit(1);
+                        updateUserFILE(cli->login_account, "", 1);
+                        close(connfd);
+                        deleteClient(connfd);
+                        break;
+                    }
+                    buff[n] = '\0';
+                    printf(CYN "[%d - %s]: %s\n" RESET, cli->connfd, cli->login_account, buff);
+                    if (atoi(buff) == 5) {}
+                    else if (atoi(buff) != questionBank[i].questions[j].true) {
+                        sprintf(mesg, "Sai! Đáp án đúng là %d\n", questionBank[i].questions[j].true);
+                        printf("%s\n", mesg);
+                        send(connfd, mesg, strlen(mesg), 0);
+                        break;
                     }
                 }
                 if (i == 15) {
@@ -601,35 +907,37 @@ void *loginSession(void *client_sock) {
                     send(connfd, mesg, strlen(mesg), 0);
                 }
             }
+            else if (strcmp(buff, "4") == 0) {
+                strcpy(mesg, "Goodbye ");
+                strcat(mesg, cli->login_account);
+                updateUserFILE(cli->login_account, "", 1);
+                changeClientAccount("", connfd);
+                cli->login_status = 0;
+                send(connfd, mesg, strlen(mesg), 0);
+                continue;
+            }
         }
     }
-    if (n < 0) {
+    if (n == 0) {
+        printf("Host disconnected: socket_fd(%d)\n", connfd);
+        updateUserFILE(cli->login_account, "", 1);
+        close(connfd);
+        deleteClient(connfd);
+    }
+    else if (n < 0) {
         perror("Read error");
-        exit(1);
+        updateUserFILE(cli->login_account, "", 1);
+        close(connfd);
+        deleteClient(connfd);
     }
     return 0;
 }
 
-void send_to_others(char *mesg, int curr){
-    char online[BUFF_SIZE];
+void send_to_others(char *mesg, int current_player, int room_number){
 	pthread_mutex_lock(&mutex);
-    struct client *tmp = client1;
-    while (tmp != NULL) {  
-        if (tmp->connfd == curr) {
-            strcpy(online, tmp->login_account);
-            break;
-        }
-        tmp = tmp->next;
-    }
-
-    tmp = client1;
-    while (tmp != NULL) {  
-        if (tmp->connfd != curr) {
-            if (strcmp(tmp->login_account, online) == 0) {
-                send(tmp->connfd, mesg, strlen(mesg), 0);
-            }
-        }
-        tmp = tmp->next;
+    for (int i = 0; i < Game.room_size[room_number]; i++) {
+        if (Game.room[room_number][i] == current_player) continue;
+        send(Game.room[room_number][i], mesg, strlen(mesg), 0);
     }
 	pthread_mutex_unlock(&mutex);
 }
