@@ -60,8 +60,8 @@ int menuplay(){
 void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
-    char data[MAXLINE], str[MAXLINE];
-    int n, op_play;
+    char data[MAXLINE];
+    int n;
 	while(1) {
 	    n =  recv(sockfd,data,MAXLINE,0 );
 	    if(n == 0 ){
@@ -79,7 +79,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = {0};
+    char ser_address[MAXLINE] = "222.252.105.252";
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -91,9 +91,9 @@ int main() {
 				if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){ 
 			        printf("\n Socket creation error \n"); 
 			        return -1; 
-			    } 
-			    printf("Enter Server Address: ");
-			    scanf(" %[^\n]", ser_address);
+			    }
+			    printf("Server Address: %s", ser_address);
+			    //scanf(" %[^\n]", ser_address);
 
 			    memset(&servaddr, 0, sizeof(servaddr));
 			    servaddr.sin_family = AF_INET;
@@ -115,6 +115,14 @@ int main() {
 				    // 	printf("Error creating thread\n");
 				    // 	exit(1);
 				    // }
+				    recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
+			    	if (recvBytes == 0) {
+			    	    perror("The server terminated prematurely");
+			    	    exit(4);
+			    	    return 0;
+			    	}
+		    	    recvBuff[recvBytes] = '\0';
+		    	    printf("%s\n", recvBuff);
 				    while(fgets( sendBuff, MAXLINE, stdin) != NULL){
 				        char *tmp = strstr(sendBuff, "\n");
 				        if(tmp != NULL) *tmp = '\0';
@@ -134,7 +142,7 @@ int main() {
 				    	    return 0;
 				    	} else {
 				    	    recvBuff[recvBytes] = '\0';
-				    	    printf("%s", recvBuff);
+				    	    printf("%s\n", recvBuff);
 				    	    if(strcmp(recvBuff, "OK") == 0){
 				    	    	do{
 									op_play = menuplay();
@@ -219,46 +227,38 @@ int main() {
 										break;
 							// choose mode online
 										case 2:
+										pthread_create(&recvt, NULL,(void *)recvmg, &sockfd);
 										while(1){
-											recvBytes = recv(sockfd, recvBuff, MAXLINE, 0);
-									    	if (recvBytes == 0) {
-									    	    perror("The server terminated prematurely");
-									    	    exit(4);
-									    	    return 0;
-									    	}
-								    	    recvBuff[recvBytes] = '\0';
-								    	    printf(CYN "%s: " RESET, recvBuff);
-								    	    printf("Your answer: \n");
-								    	    clock_t begin = clock();
-    										do {
-												scanf(" %[^\n]", str);
-												int answer = 0;
-												if (strcmp(str, "A") == 0) {
-													answer = 1;
-												}
-												else if (strcmp(str, "B") == 0) {
-													answer = 2;
-												}
-												else if (strcmp(str, "C") == 0) {
-													answer = 3;
-												}
-												else if (strcmp(str, "D") == 0) {
-													answer = 4;
-												}
-												else printf("Đáp án của bạn: ");
-												sprintf(str,"%d", answer);
-												send(sockfd , str , strlen(str) , 0 );
-												if (answer == 0) sprintf(str,"%d", answer);
-											} while (strcmp(str, "1") != 0 && strcmp(str, "2") != 0 && strcmp(str, "3") != 0 && strcmp(str, "4") != 0 );
-	    									clock_t end = clock();
-	    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
-	    									sprintf(input,"%f", time_answer);
-	    									printf("Time: %f\n", time_answer);
-	    						//fix here
-	    									if(strcmp(recvBuff,"Your answer is correct.") == 0){
-		    									send(sockfd,input, strlen(input), 0);
-		    								}
-		    							}
+								    	    if(strstr(recvBuff, "Sai! Đáp án đúng là") == NULL || strstr(recvBuff, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL){
+									    	    clock_t begin = clock();
+									    	    int answer = 0;
+									    	    char answer_str[MAXLINE];
+	    										do {
+													scanf(" %[^\n]", str);
+													if (strcmp(str, "A") == 0) {
+														answer = 1;
+													}
+													else if (strcmp(str, "B") == 0) {
+														answer = 2;
+													}
+													else if (strcmp(str, "C") == 0) {
+														answer = 3;
+													}
+													else if (strcmp(str, "D") == 0) {
+														answer = 4;
+													}
+													//else printf("Đáp án của bạn: ");
+													if (answer == 0) sprintf(str,"%d", answer);
+												} while (answer != 1 && answer != 2 && answer != 3 && answer != 4 );
+		    									printf("  ");
+		    									clock_t end = clock();
+		    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
+		    									sprintf(answer_str,"%d %f", answer, time_answer);
+		    									// printf("%s\n", str);
+												send(sockfd , answer_str , strlen(answer_str) , 0 );
+												printf("Time: %f\n", time_answer);
+	    									}else break;
+	    								}
 										break;
 							// log out
 										case 4:
