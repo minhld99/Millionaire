@@ -551,7 +551,7 @@ void *loginSession(void *client_sock) {
                                     deleteClient(connfd);
                                     return NULL;
                                 }
-                            } 
+                            } else {
                             if (tmp->status == 3) {
                                 strcpy(mesg, "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\nNhập lại tên: ");
                                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -571,7 +571,7 @@ void *loginSession(void *client_sock) {
                                     return NULL;
                                 }
                                 cli->login_status = 1;
-                            }
+                            } }
                         }
                         else {
                             if (tmp->count == 3) {
