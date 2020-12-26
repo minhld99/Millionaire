@@ -20,7 +20,7 @@
 #define MAXLINE 1000
 
 char data[MAXLINE];
-int end_game_online = 0;
+int end_game_online = 0, help = 0;
 pthread_mutex_t mutex;
 
 int menu(){
@@ -59,60 +59,33 @@ int menuplay(){
 	return op;
 }
 
-void *sendmg(void *my_sock){
+void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
-    char str[MAXLINE];
-	while(1) {
-		clock_t begin = clock();
-	    int answer = 0;
-	    char answer_str[MAXLINE];
+    int n;
+    while(1){
+	    n =  recv(sockfd,data,MAXLINE,0 );
+	    if(n == 0 ){
+	        perror("The server terminated prematurely");
+	        return 0;
+	    }
+	    data[n] = '\0';
+	    printf("%s\n", data);
 	    if(strstr(data, "Sai! Đáp án đúng là") == NULL 
 	    	&& strstr(data, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL
 	    	&& strstr(data, "Không đủ người chơi online") == NULL
 	    	&& strstr(data, "Mode online kết thúc") == NULL){
-			do {
-				scanf(" %[^\n]", str);
-				if (strcmp(str, "A") == 0) {
-					answer = 1;
-				}
-				else if (strcmp(str, "B") == 0) {
-					answer = 2;
-				}
-				else if (strcmp(str, "C") == 0) {
-					answer = 3;
-				}
-				else if (strcmp(str, "D") == 0) {
-					answer = 4;
-				}
-				//else printf("Đáp án của bạn: ");
-				if (answer == 0) sprintf(str,"%d", answer);
-			} while (answer != 1 && answer != 2 && answer != 3 && answer != 4 );
-			printf("  ");
-			clock_t end = clock();
-			double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
-			sprintf(answer_str,"%d %f", answer, time_answer);
-			send(sockfd , answer_str , strlen(answer_str) , 0 );
-			printf("Time:%f\n", time_answer);
-		}
-		else break;
-	    // n =  recv(sockfd,data,MAXLINE,0 );
-	    // if(n == 0 ){
-	    //     perror("The server terminated prematurely");
-	    //     return 0;
-	    // }
-	    // data[n] = '\0';
-	    // printf("%s\n", data);
-	    // if(strstr(data, "Sai! Đáp án đúng là") == NULL 
-	    // 	&& strstr(data, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL
-	    // 	&& strstr(data, "Không đủ người chơi online") == NULL
-	    // 	&& strstr(data, "Mode online kết thúc") == NULL){
+	    	// if(strstr(data, "[Phòng") != NULL){
+	    	// 	help = 1;
+	    	// }else{
+	    	// 	help = 0;
+	    	// }
 
-	    // } else {
-	    // 	end_game_online = 1;
-	    // 	break;
-	    // }
-     }
+	    } else {
+	    	end_game_online = 1;
+	    	break;
+	    }
+	}
 }
 
 int main() {
@@ -121,7 +94,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "222.252.105.252";
+    char ser_address[MAXLINE] = "127.0.0.1"; //222.252.105.252
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -269,25 +242,38 @@ int main() {
 										break;
 							// choose mode online
 										case 2:
-										pthread_create(&recvt, NULL,(void *)sendmg, &sockfd);
+										pthread_create(&recvt, NULL,(void *)recvmg, &sockfd);
+										pthread_join(recvt, NULL);
 										while(1){
-											recvBytes = recv(sockfd, data, MAXLINE, 0);
-											if (recvBytes == 0) {
-								    	    	perror("The server terminated prematurely");
-								    	    	exit(4);
-								    	    	return 0;
-											}
-											data[recvBytes] = '\0';
-											printf("%s\n", data);
-											if(strstr(data, "Sai! Đáp án đúng là") != NULL 
-										    	|| strstr(data, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") != NULL
-										    	|| strstr(data, "Không đủ người chơi online") != NULL
-										    	|| strstr(data, "Mode online kết thúc") != NULL){
-											// printf("%s\n",data );
-								    	    //if(end_game_online == 0){
-									   //  	    clock_t begin = clock();
-									   //  	    int answer = 0;
-									   //  	    char answer_str[MAXLINE];
+								    	    if(end_game_online == 0){
+											// if((strstr(recvBuff, "Sai! Đáp án đúng là") == NULL 
+										 //    	&& strstr(recvBuff, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL
+										 //    	&& strstr(recvBuff, "Không đủ người chơi online") == NULL
+										 //    	&& strstr(recvBuff, "Mode online kết thúc") == NULL)){
+									    	    clock_t begin = clock();
+									    	    int answer = 0;
+									    	    char answer_str[MAXLINE];
+									   //  	    if(help == 1){
+									    	    do {
+													scanf(" %[^\n]", str);
+													if (strcmp(str, "A") == 0) {
+														answer = 1;
+													}
+													else if (strcmp(str, "B") == 0) {
+														answer = 2;
+													}
+													else if (strcmp(str, "C") == 0) {
+														answer = 3;
+													}
+													else if (strcmp(str, "D") == 0) {
+														answer = 4;
+													}
+													else if( strcmp(str,"H") == 0){
+														answer = 5;
+													}
+													if (answer == 0) sprintf(str,"%d", answer);
+												} while (answer != 1 && answer != 2 && answer != 3 && answer != 4 && answer != 5 );
+									   //  	    }else
 	    							// 			do {
 												// 	scanf(" %[^\n]", str);
 												// 	if (strcmp(str, "A") == 0) {
@@ -302,19 +288,23 @@ int main() {
 												// 	else if (strcmp(str, "D") == 0) {
 												// 		answer = 4;
 												// 	}
-												// 	//else printf("Đáp án của bạn: ");
 												// 	if (answer == 0) sprintf(str,"%d", answer);
 												// } while (answer != 1 && answer != 2 && answer != 3 && answer != 4 );
-		    						// 			printf("  ");
-		    						// 			clock_t end = clock();
-		    						// 			double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
-		    						// 			sprintf(answer_str,"%d %f", answer, time_answer);
-		    									// printf("%s\n", str);
-												// send(sockfd , answer_str , strlen(answer_str) , 0 );
-												// printf("Time: %f\n", time_answer);
+		    									// }
+		    									printf("  ");
+		    									clock_t end = clock();
+		    									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
+		    									sprintf(answer_str,"%d %f", answer, time_answer);
+		    									printf("%s\n", str);
+												send(sockfd , answer_str , strlen(answer_str) , 0 );
+												// if(help == 0){
+													printf("Time: %f\n", time_answer);
+												// }
+	    									}else {
 	    										break;
-	    									};
+	    									}
 	    								}
+	    								
 	    								end_game_online = 0;
 										break;
 							// log out

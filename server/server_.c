@@ -551,7 +551,7 @@ void *loginSession(void *client_sock) {
                                     deleteClient(connfd);
                                     return NULL;
                                 }
-                            } 
+                            } else {
                             if (tmp->status == 3) {
                                 strcpy(mesg, "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\n");
                                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -571,7 +571,7 @@ void *loginSession(void *client_sock) {
                                     return NULL;
                                 }
                                 cli->login_status = 1;
-                            }
+                            } }
                         }
                         else {
                             if (tmp->count == 3) {
@@ -609,7 +609,7 @@ void *loginSession(void *client_sock) {
                 }
             }
             else if (cli->login_status == 1) {
-                sprintf(mesg, "Bạn đang đăng nhập bằng tài khoản %s.", cli->login_account);
+                int sn = snprintf(mesg, 1000, "Bạn đang đăng nhập bằng tài khoản %s.", cli->login_account);
                 if (send(connfd, mesg, strlen(mesg), 0) < 0){
                     perror("Send error");
                     deleteClient(connfd);
@@ -668,7 +668,7 @@ void *loginSession(void *client_sock) {
                 }
             }
             else if (cli->login_status == 1) {
-                sprintf(mesg, "Bạn đang đăng nhập bằng tài khoản %s. Hãy đăng xuất trước.", cli->login_account);
+                int sn = snprintf(mesg, 1000, "Bạn đang đăng nhập bằng tài khoản %s. Hãy đăng xuất trước.", cli->login_account);
                 if (send(connfd, mesg, strlen(mesg), 0) < 0){
                     perror("Send error");
                     deleteClient(connfd);
@@ -759,7 +759,7 @@ void *loginSession(void *client_sock) {
                 int room_entered = addPlayer2Game(connfd);
                 Game.main_player[room_entered] = 0; // uid_socketfd of main player
                 if (room_entered == -1) {
-                    sprintf(mesg, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
                     printf(CYN "%s\n" RESET, mesg);
                     strcpy(mesg, "Không đủ người chơi online. Hãy thử lại sau!");
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -771,11 +771,11 @@ void *loginSession(void *client_sock) {
                 }
                 else {
                     while (1) if (Game.room_status[room_entered] == 2) break;
-                    sprintf(mesg, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
+                    int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
                     printf(CYN "%s\n" RESET, mesg);
                     sprintf(mesg, "[Phòng %d] Ghép cặp thành công. Bắt đầu!", room_entered);
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                        sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                        int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                         send_to_others(mesg, connfd, room_entered);
                         resetGameRoom(room_entered, connfd);
                         printf("[Room %d]: %s\n", room_entered, mesg);
@@ -818,7 +818,7 @@ void *loginSession(void *client_sock) {
                     }
                 }
                 if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
-                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                     send_to_others(mesg, connfd, room_entered);
                     printf("[Room %d]: %s\n", room_entered, mesg);
                     resetGameRoom(room_entered, connfd);
@@ -828,7 +828,7 @@ void *loginSession(void *client_sock) {
                 }
 
                 buff[n] = '\0';
-                sprintf(mesg,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
+                int sn = snprintf(mesg,1000,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
                 printf(CYN "%s" RESET, mesg);
                 char *answer = strtok(buff, " ");
                 double time = atof(strtok(NULL, " "));
@@ -836,7 +836,7 @@ void *loginSession(void *client_sock) {
                 if (atoi(answer) == Game.true_answer[room_entered]) strcpy(mesg, "Chính xác!\nChờ kết quả từ chương trình...");
                 else sprintf(mesg, "Sai!! Đáp án đúng là %c\nChờ kết quả từ chương trình...\n", to_ABCD(Game.true_answer[room_entered]));
                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                     send_to_others(mesg, connfd, room_entered);
                     printf("[Room %d]: %s\n", room_entered, mesg);
                     resetGameRoom(room_entered, connfd);
@@ -869,7 +869,7 @@ void *loginSession(void *client_sock) {
                     while (Game.room_status[room_entered] != 0) {
                         if ((n = recv(connfd, buff, strlen(buff), MSG_DONTWAIT)) <= 0) {
                             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                                sprintf(mesg, "Người xem [%d - %s] đã thoát.\n", cli->connfd, cli->login_account);
+                                int sn = snprintf(mesg, 1000, "Người xem [%d - %s] đã thoát.\n", cli->connfd, cli->login_account);
                                 send_to_others(mesg, connfd, room_entered);
                                 resetGameRoom(room_entered, connfd);
                                 printf("Host disconnected: socket_fd(%d)\n", connfd);
@@ -884,13 +884,13 @@ void *loginSession(void *client_sock) {
                 else {
                     struct client *tmp = client1;
                     while (tmp->connfd != Game.main_player[room_entered] && tmp != NULL) tmp = tmp->next;
-                    sprintf(mesg, "Người chơi: " CYN "%s" RESET "\nKhán giả:", tmp->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi: " CYN "%s" RESET "\nKhán giả:", tmp->login_account);
                     for (int j = 0; j < Game.room_size[room_entered]; j++) {
                         char str[BUFF_SIZE] = {0};
                         tmp = client1;
                         if (Game.room[room_entered][j] != Game.main_player[room_entered]) {
                             while (tmp->connfd != Game.room[room_entered][j] && tmp != NULL) tmp = tmp->next;
-                            sprintf(str, CYN " %s" RESET, tmp->login_account);
+                            int sn = snprintf(str, 1000, CYN " %s" RESET, tmp->login_account);
                             strcat(mesg, str);
                         }
                     }
@@ -918,7 +918,8 @@ void *loginSession(void *client_sock) {
                                     sqlite3_column_text(res, 3),
                                     sqlite3_column_text(res, 4),
                                     sqlite3_column_text(res, 5));
-                                    if (i > 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                                    int sn;
+                                    if (i > 0) sn = snprintf(mesg, 1000, "Chính xác!\n\n%s", tmp);
                                     else strcpy(mesg, tmp);
                                     send_to_others(mesg, -1, room_entered);
                                     printf("%s\n", mesg);
@@ -926,7 +927,7 @@ void *loginSession(void *client_sock) {
                         }
                         help = 0;
                         if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
-                            sprintf(mesg, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                            int sn = snprintf(mesg, 1000, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
                             send_to_others(mesg, connfd, room_entered);
                             printf("[Room %d]: %s\n", room_entered, mesg);
                             resetGameRoom(room_entered, -1);
@@ -936,7 +937,7 @@ void *loginSession(void *client_sock) {
                         }
                         buff[n] = '\0';
                         char *answer = strtok(buff, " ");
-                        sprintf(mesg,"[%d - %s]: %c\n", cli->connfd, cli->login_account, to_ABCD(atoi(answer)));
+                        int sn = snprintf(mesg, 1000, "[%d - %s]: %c\n", cli->connfd, cli->login_account, to_ABCD(atoi(answer)));
                         printf(CYN "%s" RESET, mesg);
                         send_to_others(mesg, connfd, room_entered);
                         if (atoi(answer) == 5) {
@@ -964,13 +965,13 @@ void *loginSession(void *client_sock) {
                                 else if (true == 2) strcpy(option2, (char *)sqlite3_column_text(res, 3));
                                 else if (true == 3) strcpy(option2, (char *)sqlite3_column_text(res, 4));
                                 else strcpy(option2, (char *)sqlite3_column_text(res, 5));
-
+                                int sn;
                                 if (k < true)
-                                    sprintf(mesg, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
+                                    sn = snprintf(mesg, 1000, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
                                             j, i+1, sqlite3_column_text(res, 1), 
                                             to_ABCD(k), option1, to_ABCD(true), option2);
                                 else
-                                    sprintf(mesg, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
+                                    sn = snprintf(mesg, 1000, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
                                             j, i+1, sqlite3_column_text(res, 1), 
                                             to_ABCD(true), option2, to_ABCD(k), option1);
                                 printf("%s\n", mesg);
@@ -1015,14 +1016,14 @@ void *loginSession(void *client_sock) {
                     char tmp[BUFF_SIZE] = {0};
                     if (help == 0) { 
                         j = (rand() % (9 - 0 + 1)) + 0;
-                        sprintf(tmp, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
+                        int sn = snprintf(tmp, 1000, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
                         questionBank[i].questions[j].question, 
                         questionBank[i].questions[j].answerA, 
                         questionBank[i].questions[j].answerB, 
                         questionBank[i].questions[j].answerC, 
                         questionBank[i].questions[j].answerD);
                         if (i == 15) strcpy(mesg, "\nChúc mừng bạn đã trả lời đúng 15 câu hỏi!\n\n");
-                        else if (i != 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                        else if (i != 0) sn = snprintf(mesg, 1000, "Chính xác!\n\n%s", tmp);
                         else strcpy(mesg, tmp);
                         printf("%s\n", mesg);
                         if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -1135,12 +1136,13 @@ void offline5050(int connfd, int i, int j, int k, int true) {
     else strcpy(option2, questionBank[i].questions[j].answerD);
 
     if (k < true) {
-        sprintf(tmp, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(k), option1, to_ABCD(true), option2);
     }
     else {
-        sprintf(tmp, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        char buffer[1000];
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(true), option2, to_ABCD(k), option1);
     }
