@@ -80,7 +80,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "222.252.105.252";
+    char ser_address[MAXLINE] = "127.0.0.1";
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -139,6 +139,7 @@ int main() {
 								}
 								recvBuff[recvBytes] = '\0';
 								printf("%s", recvBuff);
+								if(strstr(recvBuff, "Bạn đang đăng nhập bằng tài khoản") != NULL) break;
 								char ch;
 								scanf("%c", &ch);
 								while(fgets( sendBuff, MAXLINE, stdin) != NULL) {
@@ -161,7 +162,7 @@ int main() {
 									} else {
 										recvBuff[recvBytes] = '\0';
 										printf("%s", recvBuff);
-										if(strstr(recvBuff, "OK") != NULL || strstr(recvBuff, "Tài khoản chưa sẵn sàng") != NULL || strstr(recvBuff, "Lỗi!") != NULL || strstr(recvBuff, "Tài khoản đang bị khóa.") != NULL || strstr(recvBuff, "Sai mật khẩu.") != NULL || strstr(recvBuff, "Tài khoản không tồn tại!") != NULL || strstr(recvBuff, "Bạn đang đăng nhập bằng tài khoản") != NULL) break;
+										if(strstr(recvBuff, "OK") != NULL || strstr(recvBuff, "Tài khoản chưa sẵn sàng") != NULL || strstr(recvBuff, "Lỗi!") != NULL || strstr(recvBuff, "Tài khoản đang bị khóa.") != NULL || strstr(recvBuff, "Sai mật khẩu.") != NULL || strstr(recvBuff, "Tài khoản không tồn tại!") != NULL ) break;
 									}
 								}
 								break;
@@ -175,6 +176,7 @@ int main() {
 								}
 								recvBuff[recvBytes] = '\0';
 								printf("%s", recvBuff);
+								if(strstr(recvBuff, "Bạn đang đăng nhập bằng tài khoản") != NULL ) break;
 								char c;
 								scanf("%c", &c);
 								while(fgets(sendBuff, MAXLINE, stdin) != NULL) {
@@ -197,7 +199,7 @@ int main() {
 									} else {
 										recvBuff[recvBytes] = '\0';
 										printf("%s", recvBuff);
-										if(strstr(recvBuff, "Đăng ký thành công!") != NULL || strstr(recvBuff, "Tên tài khoản đã tồn tại!") != NULL || strstr(recvBuff, "Bạn đang đăng nhập bằng tài khoản") != NULL ) break;
+										if(strstr(recvBuff, "Đăng ký thành công!") != NULL || strstr(recvBuff, "Tên tài khoản đã tồn tại!") != NULL) break;
 									}
 								}
 								break;
@@ -317,9 +319,9 @@ int main() {
 								recvBuff[recvBytes] = '\0';
 								printf("%s\n", recvBuff);
 							break;
-							default: return 0;
+							default: break;
 						}
-					}while(op_play != 7);
+					} while(op_play != 7);
 					pthread_mutex_unlock(&mutex);
 				}
 				close(sockfd);
