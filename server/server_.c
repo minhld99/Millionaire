@@ -553,7 +553,7 @@ void *loginSession(void *client_sock) {
                                 }
                             } 
                             if (tmp->status == 3) {
-                                strcpy(mesg, "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\nNhập lại tên: ");
+                                strcpy(mesg, "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\n");
                                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                                     perror("Send error");
                                     deleteClient(connfd);
@@ -576,7 +576,7 @@ void *loginSession(void *client_sock) {
                         else {
                             if (tmp->count == 3) {
                                 updateUserFILE(tmp->username, tmp->password, 0); // 0 : blocked
-                                strcpy(mesg, "Tài khoản đang bị khóa. Đăng nhập thất bại");
+                                strcpy(mesg, "Nhập sai mật khẩu 3 lần. Tài khoản đã bị khóa");
                                 printf("%s\n", mesg);
                                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                                     perror("Send error");

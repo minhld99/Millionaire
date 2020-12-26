@@ -60,12 +60,6 @@ struct level {
 };
 struct level questionBank[15];
 
-// struct game {
-//     struct client *players;
-//     struct game *next;
-//     int status; // 1: idle - waiting, 2: active - playing
-// };
-
 struct game {
     int room[BUFF_SIZE][BUFF_SIZE]; // room[index][client_sockfd]
     int room_status[BUFF_SIZE]; // room status
