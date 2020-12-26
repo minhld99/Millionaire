@@ -1,0 +1,39 @@
+Menu play:
+1. Login
+    - "Tài khoản chưa sẵn sàng"
+    - "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\nNhập lại tên: "
+    - "Tài khoản đang bị khóa. Đăng nhập thất bại"
+    - "Sai mật khẩu. Đăng nhập thất bại"
+    - "Tài khoản không tồn tại! Đăng ký mới?"
+    - "Bạn đang đăng nhập bằng tài khoản %s."
+    + "OK"
+2. Register
+    - "Tên tài khoản đã tồn tại! Hãy chọn tên khác."
+    - "Bạn đang đăng nhập bằng tài khoản %s. Hãy đăng xuất trước."
+    + "Đăng ký thành công!"
+3. Change password.
+    - "Bạn chưa đăng nhập, không thể đổi mật khẩu."
+    + "Đổi mật khẩu thành công!\nMật khẩu mới (đã được mã hóa) là: "
+4. Choose mode online.
+    - "Cần đăng nhập trước khi chơi!"
+    - "Không đủ người chơi online. Hãy thử lại sau!"
+    - "Sai! Đáp án đúng là"
+    - "Mode online kết thúc!"
+    + "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!"
+5. Choose mode offline.
+    - "Cần đăng nhập trước khi chơi!"
+    - "Sai! Đáp án đúng là"
+    + "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!"
+6. Log out.
+    - "Bạn chưa đăng nhập, không cần đăng xuất."
+    + "Goodbye"
+7. Exit.
+
+Logo:
+    printf(
+           "            _    _                                               \n"
+           "/'\\_/`\\ _  (_)  (_)  _                       _                 \n"
+           "|     |(_) | |  | | (_)   _     ___     _ _ (_) _ __   __        \n"
+           "| (_) || | | |  | | | | /'_`\\ /' _ `\\ /'_` )| |( '__)/'__`\\   \n"
+           "| | | || | | |  | | | |( (_) )| ( ) |( (_| || || |  (  ___/      \n"
+           "(_) (_)(_)(___)(___)(_)`\\___/'(_) (_)`\\__,_)(_)(_)  `\\____) \n\n");
