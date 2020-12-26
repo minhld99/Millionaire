@@ -1136,13 +1136,13 @@ void offline5050(int connfd, int i, int j, int k, int true) {
     else strcpy(option2, questionBank[i].questions[j].answerD);
 
     if (k < true) {
-        int j = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(k), option1, to_ABCD(true), option2);
     }
     else {
         char buffer[1000];
-        int j = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(true), option2, to_ABCD(k), option1);
     }
