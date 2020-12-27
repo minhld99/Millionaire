@@ -76,7 +76,8 @@ void *recvmg(void *my_sock){
 	    if(strstr(data, "Sai! Đáp án đúng là") == NULL 
 	    && strstr(data, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL
 	    && strstr(data, "Không đủ người chơi online") == NULL
-	    && strstr(data, "Mode online kết thúc") == NULL){
+	    && strstr(data, "Mode online kết thúc") == NULL
+	    && strstr(data, "Cần đăng nhập trước khi chơi!") == NULL){
 			continue;
 	    } else {
 	    	end_game_online = 1;
@@ -91,7 +92,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "127.0.0.1"; //222.252.105.252
+    char ser_address[MAXLINE] = "222.252.105.252"; //222.252.105.252
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -239,10 +240,12 @@ int main() {
 								break;
 							// choose mode online
 							case 4:
+
 								pthread_create(&recvt, NULL,(void *)recvmg, &sockfd);
 								// pthread_join(recvt, NULL);
 								while(1){
 									clock_t begin = clock();
+									printf("");
 									int answer = 0;
 									char answer_str[MAXLINE];
 									do {
@@ -250,6 +253,7 @@ int main() {
 										struct pollfd mypoll = { STDIN_FILENO, POLLIN|POLLPRI };
 										if(poll(&mypoll, 1, 2000)) scanf(" %[^\n]", str);
 										else continue;
+										str[0]=toupper(str[0]);
 										if (strcmp(str, "A") == 0) {
 											answer = 1;
 										}
