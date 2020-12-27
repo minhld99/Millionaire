@@ -28,12 +28,12 @@ int menu(){
 	int op;
 	char input[MAXLINE];
 	do{
-		printf("\n-------------MENU-------------\n");
-		printf("1. Play.\n");
-		printf("2. How to play.\n");
-		printf("3. Credits.\n");
-		printf("4. Exit.\n");
-		printf("Enter your choice: ");
+		printf("\n------------------------------\n");
+		printf("1. Bắt đầu.\n");
+		printf("2. Cách chơi.\n");
+		printf("3. Tác giả.\n");
+		printf("4. Kết thúc.\n");
+		printf("Nhập lựa chọn của bạn: ");
 		scanf(" %[^\n]", input);
 	    if (strlen(input) != 1 || !isdigit(input[0])) break;
 	    op = atoi(input);
@@ -46,14 +46,14 @@ int menuplay(){
 	int op;
 	do{
 		printf("\n************************************\n");
-		printf("\tMenu play\n");
-		printf("\t1. Login\n");
-		printf("\t2. Register\n");
-		printf("\t3. Change password.\n");
-		printf("\t4. Choose mode online.\n");
-		printf("\t5. Choose mode offline.\n");
-		printf("\t6. Log out.\n");
-		printf("\t7. Exit.\n");
+		printf("\t************************************\n");
+		printf("\t1. Đăng nhập\n");
+		printf("\t2. Đăng ký\n");
+		printf("\t3. Thay đổi mật khẩu.\n");
+		printf("\t4. Thi đấu.\n");
+		printf("\t5. Luyện tập.\n");
+		printf("\t6. Đăng xuất.\n");
+		printf("\t7. Thoát.\n");
 		scanf(" %[^\n]", input);
 	    if (strlen(input) != 1 || !isdigit(input[0])) break;
 	    op = atoi(input);
