@@ -72,7 +72,7 @@ void *recvmg(void *my_sock){
 	        return 0;
 	    }
 	    data[n] = '\0';
-	    printf("%s\n", data);
+	    printf("%s", data);
 	    if(strstr(data, "Sai! Đáp án đúng là") == NULL 
 	    && strstr(data, "Chúc mừng bạn đã trả lời đúng 15 câu hỏi!") == NULL
 	    && strstr(data, "Không đủ người chơi online") == NULL
@@ -92,7 +92,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "222.252.105.252"; //222.252.105.252
+    char ser_address[MAXLINE] = "127.0.0.1"; //222.252.105.252
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -245,7 +245,7 @@ int main() {
 								// pthread_join(recvt, NULL);
 								while(1){
 									clock_t begin = clock();
-									printf("");
+									//printf("");
 									int answer = 0;
 									char answer_str[MAXLINE];
 									do {
@@ -273,11 +273,11 @@ int main() {
 										if (answer == 0) sprintf(str,"%d", answer);
 									} while (answer != 1 && answer != 2 && answer != 3 && answer != 4 && answer != 5 );
 									if (end_game_online == 1) break;
-									printf("  ");
+									//printf("  ");
 									clock_t end = clock();
 									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
 									sprintf(answer_str,"%d %f", answer, time_answer);
-									printf("%s\n", str);
+									//printf("%s\n", str);
 									send(sockfd , answer_str , strlen(answer_str) , 0 );
 									printf("Time: %f\n", time_answer);
 								}
