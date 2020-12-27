@@ -10,7 +10,6 @@
 #include <ctype.h>
 #include <time.h>
 #include <poll.h>
-#include <termios.h>
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
 #define YEL   "\x1B[33m"
@@ -121,13 +120,13 @@ int main() {
 			    inet_aton(ser_address, &servaddr.sin_addr);
 			    servaddr.sin_port = htons(6000);
 
-			    printf("\n************************************\nConnecting....\n\n");
+			    printf("\n************************************\n\nConnecting....\n\n");
 			    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){ 
 			        printf("\nConnection Failed \n"); 
 			        return -1; 
 			    }
 			    else {
-			    	printf("Connected!\n************************************\n\n");
+			    	printf("Connected!\n");
 			    	// char c;
 			    	// scanf("%c", &c);
 			    	// pthread_mutex_lock(&mutex);
@@ -152,19 +151,9 @@ int main() {
 								recvBuff[recvBytes] = '\0';
 								printf("%s", recvBuff);
 								if(strstr(recvBuff, "Bạn đang đăng nhập bằng tài khoản") != NULL) break;
-								struct termios old, new;
-								if(strstr(recvBuff, "Nhập mật khẩu") != NULL) {
-									if (tcgetattr(fileno (stdin), &old) == 0) {
-										new = old;
-										new.c_lflag &= ~ECHO;
-										tcsetattr(fileno (stdin), TCSAFLUSH, &new);
-									}
-								}
 								char ch;
 								scanf("%c", &ch);
 								while(fgets( sendBuff, MAXLINE, stdin) != NULL) {
-									if (strstr(recvBuff, "Nhập mật khẩu") != NULL)
-										(void) tcsetattr (fileno (stdin), TCSAFLUSH, &old);
 									char *tmp = strstr(sendBuff, "\n");
 									if(tmp != NULL) *tmp = '\0';
 									int check = 0, count, answer;
