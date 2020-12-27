@@ -506,104 +506,190 @@ void *loginSession(void *client_sock) {
     char buff[BUFF_SIZE] = {0};
     struct client *cli = client1;
     while (cli->connfd != connfd && cli != NULL) cli = cli->next;
-	int n;
-    strcpy(buff, "Enter username: ");
-    if (send(connfd, buff, strlen(buff), 0) < 0){
-        perror("Send error");
-        deleteClient(connfd);
-        return NULL;
-    }
+	int n = 0;
 	while((n = recv(connfd, buff, BUFF_SIZE, 0)) > 0) {
-        char mesg[BUFF_SIZE] = {0};
         buff[n] = '\0';
-        if (cli->login_status == 0) {
-            printf(CYN "[%d]: %s\n" RESET, connfd, buff);
-            struct user *tmp = head;
-            while (tmp != NULL) {
-                if (strcmp(tmp->username, buff) == 0) {
-                    strcpy(mesg, "Insert password: ");
+        printf(CYN "[%d]: %s\n" RESET, connfd, buff);
+        char mesg[BUFF_SIZE] = {0};
+        // Login
+        if (strcmp(buff, "1") == 0) {
+            if (cli->login_status == 0) {
+                strcpy(mesg, "Nhập tên: ");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
+                    printf("Host disconnected: socket_fd(%d)\n", connfd);
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                buff[n] = '\0';
+                printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
+                struct user *tmp = head;
+                while (tmp != NULL) {
+                    if (strcmp(tmp->username, buff) == 0) {
+                        strcpy(mesg, "Nhập mật khẩu: ");
+                        if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                            perror("Send error");
+                            deleteClient(connfd);
+                            return NULL;
+                        }
+                        if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
+                            printf("Host disconnected: socket_fd(%d)\n", connfd);
+                            deleteClient(connfd);
+                            return NULL;
+                        }
+                        buff[n] = '\0';
+                        printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
+                        if (strcmp(tmp->password, buff) == 0) {
+                            if (tmp->status == 0 || tmp->status == 2) {
+                                strcpy(mesg, "Tài khoản chưa sẵn sàng");
+                                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                                    perror("Send error");
+                                    deleteClient(connfd);
+                                    return NULL;
+                                }
+                            } else {
+                            if (tmp->status == 3) {
+                                strcpy(mesg, "Lỗi! Tài khoản đang đăng nhập trên thiết bị khác.\n");
+                                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                                    perror("Send error");
+                                    deleteClient(connfd);
+                                    return NULL;
+                                }
+                            }
+                            else {
+                                tmp->count = 1;
+                                strcpy(mesg, "OK");
+                                updateUserFILE(tmp->username, "", 3);
+                                changeClientAccount(tmp->username, connfd);
+                                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                                    perror("Send error");
+                                    deleteClient(connfd);
+                                    return NULL;
+                                }
+                                cli->login_status = 1;
+                            } }
+                        }
+                        else {
+                            if (tmp->count == 3) {
+                                updateUserFILE(tmp->username, tmp->password, 0); // 0 : blocked
+                                strcpy(mesg, "Nhập sai mật khẩu 3 lần. Tài khoản đã bị khóa");
+                                printf("%s\n", mesg);
+                                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                                    perror("Send error");
+                                    deleteClient(connfd);
+                                    return NULL;
+                                }
+                            }
+                            else {
+                                strcpy(mesg, "Sai mật khẩu. Đăng nhập thất bại");
+                                tmp->count++;
+                                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+                                    perror("Send error");
+                                    deleteClient(connfd);
+                                    return NULL;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    tmp = tmp->next;
+                }
+                if (tmp == NULL) {
+                    strcpy(mesg, "Tài khoản không tồn tại! Đăng ký mới?");
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                         perror("Send error");
                         deleteClient(connfd);
                         return NULL;
                     }
-                    if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
-                        printf("Host disconnected: socket_fd(%d)\n", connfd);
-                        deleteClient(connfd);
-                        return NULL;
-                    }
-                    buff[n] = '\0';
-                    printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
-                    if (strcmp(tmp->password, buff) == 0) {
-                        if (tmp->status == 0 || tmp->status == 2) {
-                            strcpy(mesg, "account not ready");
-                            if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                                perror("Send error");
-                                deleteClient(connfd);
-                                return NULL;
-                            }
-                        } 
-                        if (tmp->status == 3) {
-                            strcpy(mesg, "Error! Account is online in another device.\nEnter username: ");
-                            if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                                perror("Send error");
-                                deleteClient(connfd);
-                                return NULL;
-                            }
-                        }
-                        else {
-                            tmp->count = 1;
-                            strcpy(mesg, "OK");
-                            updateUserFILE(tmp->username, "", 3);
-                            changeClientAccount(tmp->username, connfd);
-                            if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                                perror("Send error");
-                                deleteClient(connfd);
-                                return NULL;
-                            }
-                            cli->login_status = 1;
-                        }
-                    }
-                    else {
-                        if (tmp->count == 3) {
-                            updateUserFILE(tmp->username, tmp->password, 0); // 0 : blocked
-                            strcpy(mesg, "Account is blocked");
-                            printf("%s\n", mesg);
-                            if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                                perror("Send error");
-                                deleteClient(connfd);
-                                return NULL;
-                            }
-                        }
-                        else {
-                            strcpy(mesg, "Not OK");
-                            tmp->count++;
-                            if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                                perror("Send error");
-                                deleteClient(connfd);
-                                return NULL;
-                            }
-                        }
-                    }
-                    break;
+                    continue;
                 }
-                tmp = tmp->next;
             }
-            if (tmp == NULL) {
-                strcpy(mesg, "Wrong account! Please register first.");
-                if (send(connfd, mesg, strlen(mesg), 0) < 0) {
+            else if (cli->login_status == 1) {
+                int sn = snprintf(mesg, 1000, "Bạn đang đăng nhập bằng tài khoản %s.", cli->login_account);
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
                     perror("Send error");
                     deleteClient(connfd);
                     return NULL;
                 }
-                continue;
             }
         }
-        else if (cli->login_status == 1) {
-            printf(CYN "[%d - %s]: %s\n" RESET, connfd, cli->login_account, buff);
-            // receive new password
-            if (strcmp(buff, "1") == 0) {
-                strcpy(mesg, "Enter new password");
+
+        // Register
+        else if (strcmp(buff, "2") == 0) {
+            if (cli->login_status == 0) {
+                char name[BUFF_SIZE] = {0};
+                char pass[BUFF_SIZE] = {0};
+                strcpy(mesg, "Nhập tên: ");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
+                    printf("Host disconnected: socket_fd(%d)\n", connfd);
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                buff[n] = '\0';
+                printf(CYN "[%d]: %s\n" RESET, cli->connfd, buff);
+                strcpy(mesg, "Nhập mật khẩu: ");
+                struct user *tmp = head;
+                while (tmp != NULL) {  
+                    if (strcmp(tmp->username, buff) == 0) {
+                        strcpy(mesg, "Tên tài khoản đã tồn tại! Hãy chọn tên khác.");
+                        break;
+                    }
+                    tmp = tmp->next;  
+                }
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                if (strcmp(mesg, "Nhập mật khẩu: ") != 0) continue;
+                else strcpy(name, buff);
+                if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
+                    printf("Host disconnected: socket_fd(%d)\n", connfd);
+                    deleteClient(connfd);
+                    return NULL;
+                }
+                strcpy(pass, buff);
+                addAccount(name, pass, 1);
+                updateUserFILE(name, pass, 1);
+                strcpy(mesg, "Đăng ký thành công!");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+            else if (cli->login_status == 1) {
+                int sn = snprintf(mesg, 1000, "Bạn đang đăng nhập bằng tài khoản %s. Hãy đăng xuất trước.", cli->login_account);
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+        }
+
+        // Change password
+        else if (strcmp(buff, "3") == 0) {
+            if (cli->login_status == 0) {
+                strcpy(mesg, "Bạn chưa đăng nhập, không thể đổi mật khẩu.");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+            else if (cli->login_status == 1) {
+                // receive new password
+                strcpy(mesg, "Nhập mật khẩu mới: ");
                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                     perror("Send error");
                     deleteClient(connfd);
@@ -616,9 +702,9 @@ void *loginSession(void *client_sock) {
                 }
                 buff[n] = '\0';
                 printf(CYN "[%d - %s]: %s\n" RESET, cli->connfd, cli->login_account, buff);
-                int alphabet = 0, number = 0, i; 
+                int i, alphabet = 0, number = 0; 
                 char alpha[BUFF_SIZE] = {0}, digit[BUFF_SIZE] = {0}; 
-                for (i=0; buff[i]!= '\0'; i++) { 
+                for (i = 0; buff[i]!= '\0'; i++) { 
                     // check for alphabets 
                     if (isalpha(buff[i]) != 0) {
                         alpha[alphabet] = buff[i];
@@ -640,7 +726,7 @@ void *loginSession(void *client_sock) {
                     }
                 }
                 if (alphabet != 0 || number != 0) {
-                    strcpy(mesg, "Password changed succesfully! Encrypted password: ");
+                    strcpy(mesg, "Đổi mật khẩu thành công!\nMật khẩu mới (đã được mã hóa) là: ");
                     strcat(mesg, digit);
                     strcat(mesg, alpha);
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -651,7 +737,19 @@ void *loginSession(void *client_sock) {
                     updateUserFILE(cli->login_account, buff, 4); // 4 ~ keep the current status
                 }
             }
-            else if (strcmp(buff, "2") == 0) { // 1 player, n spectators
+        }
+
+        // Play online
+        else if (strcmp(buff, "4") == 0) {
+            if (cli->login_status == 0) {
+                strcpy(mesg, "Cần đăng nhập trước khi chơi!");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+            else if (cli->login_status == 1) {
                 strcpy(mesg, "Đang kiểm tra, chờ chút...\n");
                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                     perror("Send error");
@@ -661,7 +759,7 @@ void *loginSession(void *client_sock) {
                 int room_entered = addPlayer2Game(connfd);
                 Game.main_player[room_entered] = 0; // uid_socketfd of main player
                 if (room_entered == -1) {
-                    sprintf(mesg, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
                     printf(CYN "%s\n" RESET, mesg);
                     strcpy(mesg, "Không đủ người chơi online. Hãy thử lại sau!");
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -673,11 +771,11 @@ void *loginSession(void *client_sock) {
                 }
                 else {
                     while (1) if (Game.room_status[room_entered] == 2) break;
-                    sprintf(mesg, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
+                    int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
                     printf(CYN "%s\n" RESET, mesg);
                     sprintf(mesg, "[Phòng %d] Ghép cặp thành công. Bắt đầu!", room_entered);
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                        sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                        int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                         send_to_others(mesg, connfd, room_entered);
                         resetGameRoom(room_entered, connfd);
                         printf("[Room %d]: %s\n", room_entered, mesg);
@@ -720,7 +818,7 @@ void *loginSession(void *client_sock) {
                     }
                 }
                 if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
-                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                     send_to_others(mesg, connfd, room_entered);
                     printf("[Room %d]: %s\n", room_entered, mesg);
                     resetGameRoom(room_entered, connfd);
@@ -730,7 +828,7 @@ void *loginSession(void *client_sock) {
                 }
 
                 buff[n] = '\0';
-                sprintf(mesg,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
+                int sn = snprintf(mesg,1000,"[%d - %s]: %s\n", cli->connfd, cli->login_account, buff);
                 printf(CYN "%s" RESET, mesg);
                 char *answer = strtok(buff, " ");
                 double time = atof(strtok(NULL, " "));
@@ -738,7 +836,7 @@ void *loginSession(void *client_sock) {
                 if (atoi(answer) == Game.true_answer[room_entered]) strcpy(mesg, "Chính xác!\nChờ kết quả từ chương trình...");
                 else sprintf(mesg, "Sai!! Đáp án đúng là %c\nChờ kết quả từ chương trình...\n", to_ABCD(Game.true_answer[room_entered]));
                 if (send(connfd, mesg, strlen(mesg), 0) < 0) {
-                    sprintf(mesg, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                     send_to_others(mesg, connfd, room_entered);
                     printf("[Room %d]: %s\n", room_entered, mesg);
                     resetGameRoom(room_entered, connfd);
@@ -771,7 +869,7 @@ void *loginSession(void *client_sock) {
                     while (Game.room_status[room_entered] != 0) {
                         if ((n = recv(connfd, buff, strlen(buff), MSG_DONTWAIT)) <= 0) {
                             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                                sprintf(mesg, "Người xem [%d - %s] đã thoát.\n", cli->connfd, cli->login_account);
+                                int sn = snprintf(mesg, 1000, "Người xem [%d - %s] đã thoát.\n", cli->connfd, cli->login_account);
                                 send_to_others(mesg, connfd, room_entered);
                                 resetGameRoom(room_entered, connfd);
                                 printf("Host disconnected: socket_fd(%d)\n", connfd);
@@ -786,13 +884,13 @@ void *loginSession(void *client_sock) {
                 else {
                     struct client *tmp = client1;
                     while (tmp->connfd != Game.main_player[room_entered] && tmp != NULL) tmp = tmp->next;
-                    sprintf(mesg, "Người chơi: " CYN "%s" RESET "\nKhán giả:", tmp->login_account);
+                    int sn = snprintf(mesg, 1000, "Người chơi: " CYN "%s" RESET "\nKhán giả:", tmp->login_account);
                     for (int j = 0; j < Game.room_size[room_entered]; j++) {
                         char str[BUFF_SIZE] = {0};
                         tmp = client1;
                         if (Game.room[room_entered][j] != Game.main_player[room_entered]) {
                             while (tmp->connfd != Game.room[room_entered][j] && tmp != NULL) tmp = tmp->next;
-                            sprintf(str, CYN " %s" RESET, tmp->login_account);
+                            int sn = snprintf(str, 1000, CYN " %s" RESET, tmp->login_account);
                             strcat(mesg, str);
                         }
                     }
@@ -820,7 +918,8 @@ void *loginSession(void *client_sock) {
                                     sqlite3_column_text(res, 3),
                                     sqlite3_column_text(res, 4),
                                     sqlite3_column_text(res, 5));
-                                    if (i > 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                                    int sn;
+                                    if (i > 0) sn = snprintf(mesg, 1000, "Chính xác!\n\n%s", tmp);
                                     else strcpy(mesg, tmp);
                                     send_to_others(mesg, -1, room_entered);
                                     printf("%s\n", mesg);
@@ -828,7 +927,7 @@ void *loginSession(void *client_sock) {
                         }
                         help = 0;
                         if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
-                            sprintf(mesg, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
+                            int sn = snprintf(mesg, 1000, "Người chơi chính [%d - %s] đã thoát.\nMode online kết thúc!", cli->connfd, cli->login_account);
                             send_to_others(mesg, connfd, room_entered);
                             printf("[Room %d]: %s\n", room_entered, mesg);
                             resetGameRoom(room_entered, -1);
@@ -838,7 +937,7 @@ void *loginSession(void *client_sock) {
                         }
                         buff[n] = '\0';
                         char *answer = strtok(buff, " ");
-                        sprintf(mesg,"[%d - %s]: %c\n", cli->connfd, cli->login_account, to_ABCD(atoi(answer)));
+                        int sn = snprintf(mesg, 1000, "[%d - %s]: %c\n", cli->connfd, cli->login_account, to_ABCD(atoi(answer)));
                         printf(CYN "%s" RESET, mesg);
                         send_to_others(mesg, connfd, room_entered);
                         if (atoi(answer) == 5) {
@@ -866,13 +965,13 @@ void *loginSession(void *client_sock) {
                                 else if (true == 2) strcpy(option2, (char *)sqlite3_column_text(res, 3));
                                 else if (true == 3) strcpy(option2, (char *)sqlite3_column_text(res, 4));
                                 else strcpy(option2, (char *)sqlite3_column_text(res, 5));
-
+                                int sn;
                                 if (k < true)
-                                    sprintf(mesg, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
+                                    sn = snprintf(mesg, 1000, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
                                             j, i+1, sqlite3_column_text(res, 1), 
                                             to_ABCD(k), option1, to_ABCD(true), option2);
                                 else
-                                    sprintf(mesg, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
+                                    sn = snprintf(mesg, 1000, "Bạn đã sử dụng sự trợ giúp 50/50 " CYN "(Còn %d lượt)" RESET "\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ",
                                             j, i+1, sqlite3_column_text(res, 1), 
                                             to_ABCD(true), option2, to_ABCD(k), option1);
                                 printf("%s\n", mesg);
@@ -898,21 +997,33 @@ void *loginSession(void *client_sock) {
                 }
                 resetGameRoom(room_entered, -1);
             }
-            else if (strcmp(buff, "3") == 0) {
+        }
+
+        // Play offline
+        else if (strcmp(buff, "5") == 0) {
+            if (cli->login_status == 0) {
+                strcpy(mesg, "Cần đăng nhập trước khi chơi!");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+            else if (cli->login_status == 1) {
                 srand(time(0));
                 int i, j, k, help;
                 for (i = 0; i < 15; i++) {
                     char tmp[BUFF_SIZE] = {0};
                     if (help == 0) { 
                         j = (rand() % (9 - 0 + 1)) + 0;
-                        sprintf(tmp, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
+                        int sn = snprintf(tmp, 1000, "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
                         questionBank[i].questions[j].question, 
                         questionBank[i].questions[j].answerA, 
                         questionBank[i].questions[j].answerB, 
                         questionBank[i].questions[j].answerC, 
                         questionBank[i].questions[j].answerD);
                         if (i == 15) strcpy(mesg, "\nChúc mừng bạn đã trả lời đúng 15 câu hỏi!\n\n");
-                        else if (i != 0) sprintf(mesg, "Chính xác!\n\n%s", tmp);
+                        else if (i != 0) sn = snprintf(mesg, 1000, "Chính xác!\n\n%s", tmp);
                         else strcpy(mesg, tmp);
                         printf("%s\n", mesg);
                         if (send(connfd, mesg, strlen(mesg), 0) < 0) {
@@ -956,7 +1067,19 @@ void *loginSession(void *client_sock) {
                     }
                 }
             }
-            else if (strcmp(buff, "4") == 0) {
+        }
+
+        // Log out
+        else if (strcmp(buff, "6") == 0) {
+            if (cli->login_status == 0) {
+                strcpy(mesg, "Bạn chưa đăng nhập, không cần đăng xuất.");
+                if (send(connfd, mesg, strlen(mesg), 0) < 0){
+                    perror("Send error");
+                    deleteClient(connfd);
+                    return NULL;
+                }
+            }
+            else if (cli->login_status == 1) {
                 strcpy(mesg, "Goodbye ");
                 strcat(mesg, cli->login_account);
                 updateUserFILE(cli->login_account, "", 1);
@@ -967,7 +1090,6 @@ void *loginSession(void *client_sock) {
                     deleteClient(connfd);
                     break;
                 }
-                continue;
             }
         }
     }
@@ -1014,12 +1136,13 @@ void offline5050(int connfd, int i, int j, int k, int true) {
     else strcpy(option2, questionBank[i].questions[j].answerD);
 
     if (k < true) {
-        sprintf(tmp, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(k), option1, to_ABCD(true), option2);
     }
     else {
-        sprintf(tmp, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+        char buffer[1000];
+        int sn = snprintf(tmp, 1000, "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
                 i+1, questionBank[i].questions[j].question, 
                 to_ABCD(true), option2, to_ABCD(k), option1);
     }
