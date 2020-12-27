@@ -757,7 +757,7 @@ void *loginSession(void *client_sock) {
                     break;
                 }
                 int room_entered = addPlayer2Game(connfd);
-                Game.main_player[room_entered] = 0; // uid_socketfd of main player
+                Game.main_player[room_entered] = -1; // uid_socketfd of main player
                 if (room_entered == -1) {
                     int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room failed!", cli->connfd, cli->login_account);
                     printf(CYN "%s\n" RESET, mesg);
@@ -861,7 +861,9 @@ void *loginSession(void *client_sock) {
                     if (loop == 1) continue;
                     break;
                 }
-                Game.main_player[room_entered] = chooseMainPlayer(room_entered, Game.true_answer[room_entered]);
+                if (connfd == Game.room[room_entered][0])
+                    Game.main_player[room_entered] = chooseMainPlayer(room_entered, Game.true_answer[room_entered]);
+                else while(Game.main_player[room_entered] == -1) continue;   
                 if (Game.main_player[room_entered] == 0) continue;
 
                 // Spectators
