@@ -10,7 +10,7 @@
 #include <pthread.h>
 #include <errno.h> 
 #include <time.h> // rand()
-#include <sqlite/sqlite3.h>
+#include <sqlite3.h>
 
 #define BUFF_SIZE 1000
 #define TRUE 1
