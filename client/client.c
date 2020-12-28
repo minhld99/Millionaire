@@ -93,7 +93,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "10.90.126.59"; //222.252.105.252
+    char ser_address[MAXLINE] = "127.0.0.1"; //222.252.105.252
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
@@ -278,7 +278,7 @@ int main() {
 									clock_t end = clock();
 									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
 									sprintf(answer_str,"%d %f", answer, time_answer);
-									//printf("%s\n", str);
+									printf("%s\n", str);
 									send(sockfd , answer_str , strlen(answer_str) , 0 );
 									printf("Time: %f\n", time_answer);
 								}
