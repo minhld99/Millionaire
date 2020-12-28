@@ -20,6 +20,7 @@
 #define RESET "\x1B[0m"
 #define MAXLINE 1000
 
+
 int end_game_online = 0, help = 0;
 pthread_mutex_t mutex;
 
@@ -65,6 +66,7 @@ void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
     int n;
+	char data[MAXLINE];
     while(1){
 
 	    n =  recv(sockfd,data,MAXLINE,0 );
@@ -278,7 +280,7 @@ int main() {
 									clock_t end = clock();
 									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
 									sprintf(answer_str,"%d %f", answer, time_answer);
-									//printf("%s\n", str);
+									printf("%s\n", str);
 									send(sockfd , answer_str , strlen(answer_str) , 0 );
 									printf("Time: %f\n", time_answer);
 								}
