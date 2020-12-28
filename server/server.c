@@ -460,7 +460,7 @@ void updateUserFILE(char name[BUFF_SIZE], char new_pass[BUFF_SIZE], int new_stat
         exit(1);             
     }
     struct user *tmp = head;
-    while (tmp != NULL) {  
+    while (tmp != NULL) {
         if (strcmp(tmp->username, name) == 0) {
             // memcpy(tmp->password, new_pass, BUFF_SIZE);
             if (strcmp(new_pass, "") != 0) strcpy(tmp->password, new_pass);
@@ -773,7 +773,7 @@ void *loginSession(void *client_sock) {
                     while (1) if (Game.room_status[room_entered] == 2) break;
                     int sn = snprintf(mesg, 1000, "Player [%d - %s] enter room %d.", cli->connfd, cli->login_account, room_entered);
                     printf(CYN "%s\n" RESET, mesg);
-                    sprintf(mesg, "[Phòng %d] Ghép cặp thành công. Bắt đầu!", room_entered);
+                    sprintf(mesg, "[Phòng %d] Ghép cặp thành công. Bắt đầu!\n", room_entered);
                     if (send(connfd, mesg, strlen(mesg), 0) < 0) {
                         int sn = snprintf(mesg, 1000, "Người chơi [%d - %s] đã thoát.", cli->connfd, cli->login_account);
                         send_to_others(mesg, connfd, room_entered);
@@ -1105,9 +1105,10 @@ void *loginSession(void *client_sock) {
 void send_to_others(char *mesg, int current_player, int room_number){
 	pthread_mutex_lock(&mutex);
     for (int i = 0; i < Game.room_size[room_number]; i++) {
+        printf("Send_to_others: %d\n", Game.room[room_number][i]);
         if (Game.room[room_number][i] == current_player) continue;
         if (send(Game.room[room_number][i], mesg, strlen(mesg), 0) < 0) {
-            perror("Send error");
+            printf("Send failed!\n");
             deleteClient(Game.room[room_number][i]);
         }
     }
