@@ -20,7 +20,7 @@
 #define RESET "\x1B[0m"
 #define MAXLINE 1000
 
-char data[MAXLINE];
+
 int end_game_online = 0, help = 0;
 pthread_mutex_t mutex;
 
@@ -65,6 +65,7 @@ void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
     int n;
+	char data[MAXLINE];
     while(1){
 	    n =  recv(sockfd,data,MAXLINE,0 );
 	    if(n == 0 ){
@@ -92,7 +93,7 @@ int main() {
 	int sockfd = 0, valread;
     pthread_t recvt;
     struct sockaddr_in servaddr, cliaddr; 
-    char ser_address[MAXLINE] = "127.0.0.1"; //222.252.105.252
+    char ser_address[MAXLINE] = "10.90.126.59"; //222.252.105.252
     // menu
 	int op, op_play;
 	char str[MAXLINE] = {0}, *input;
