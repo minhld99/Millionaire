@@ -20,7 +20,6 @@
 #define RESET "\x1B[0m"
 #define MAXLINE 1000
 
-char data[MAXLINE];
 int end_game_online = 0, help = 0;
 pthread_mutex_t mutex;
 
@@ -62,10 +61,12 @@ int menuplay(){
 }
 
 void *recvmg(void *my_sock){
+	char data[MAXLINE];
 	int sockfd = *((int *)my_sock);
     int len;
     int n;
     while(1){
+
 	    n =  recv(sockfd,data,MAXLINE,0 );
 	    if(n == 0 ){
 	        perror("The server terminated prematurely");
@@ -245,7 +246,7 @@ int main() {
 								// pthread_join(recvt, NULL);
 								while(1){
 									clock_t begin = clock();
-									//printf("");
+									// printf("");
 									int answer = 0;
 									char answer_str[MAXLINE];
 									do {
@@ -273,7 +274,7 @@ int main() {
 										if (answer == 0) sprintf(str,"%d", answer);
 									} while (answer != 1 && answer != 2 && answer != 3 && answer != 4 && answer != 5 );
 									if (end_game_online == 1) break;
-									//printf("  ");
+									// printf("  ");
 									clock_t end = clock();
 									double time_answer = (double)(end - begin) / CLOCKS_PER_SEC;
 									sprintf(answer_str,"%d %f", answer, time_answer);
@@ -344,7 +345,7 @@ int main() {
 							default: break;
 						}
 					} while(op_play != 7);
-					// pthread_mutex_unlock(&mutex);
+					pthread_mutex_unlock(&mutex);
 				}
 				close(sockfd);
 			break;
