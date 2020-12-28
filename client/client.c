@@ -66,7 +66,6 @@ void *recvmg(void *my_sock){
 	int sockfd = *((int *)my_sock);
     int len;
     int n;
-	char data[MAXLINE];
     while(1){
 
 	    n =  recv(sockfd,data,MAXLINE,0 );
