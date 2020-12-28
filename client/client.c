@@ -46,7 +46,7 @@ int menuplay(){
 	int op;
 	do{
 		printf("\n************************************\n");
-		printf("\t************************************\n");
+		// printf("\t************************************\n");
 		printf("\t1. Đăng nhập\n");
 		printf("\t2. Đăng ký\n");
 		printf("\t3. Thay đổi mật khẩu.\n");
@@ -350,17 +350,17 @@ int main() {
 				close(sockfd);
 			break;
 			case 2:
-				printf("*****How to play*****\n");
-				printf("1. Chon play de dang nhap.\n");
-				printf("2. Sau khi dang nhap chon choi online va offline\n");
-				printf("3. Neu chon chuc nang choi online, cho khoang 30s \n   de cho nguoi choi thu 2.\n");
-				printf("4. 2 nguoi choi se thi dau voi nhau roi chon nguoi \n   ra nguoi chien thang de choi game.\n");			
+				printf("\n***** How to play *****\n");
+				printf("1. Chọn bắt đầu.\n");
+				printf("2. Chọn thi đấu (online) hoặc luyện tập (offline).\n");
+				printf("3. Nhập A, B, C, D để chọn đáp án đúng; H để sử dụng trợ giúp 50/50.\n");
+				printf("4. Online được sử dụng trợ giúp tối đa 3 lần, offline không giới hạn.\n");	
 			break;
 			case 3:
-				printf("*********Credit*********\n");
-				printf("1. Nguyen Thi Thuy Linh\n");
-				printf("2. Luong Duc Minh\n");
-				printf("3. Nguyen Thanh Ha\n");
+				printf("\n********* Credit *********\n");
+				printf("1. Nguyễn Thị Thùy Linh\n");
+				printf("2. Nguyễn Thanh Hà\n");
+				printf("3. Lương Đức Minh\n");
 			break;
 			default: break;
 		}
