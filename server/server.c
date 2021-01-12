@@ -51,13 +51,14 @@ struct question {
     char answerD[BUFF_SIZE];
     int true; // true = {1, 2, 3, 4}
     int used; // used = {0, 1}
+    int help5050[2];
 };
 // struct question questions[BUFF_SIZE];
 
 struct level {
     struct question questions[BUFF_SIZE];
 };
-struct level questionBank[15];
+struct level questionBank[15] = {0};
 
 struct game {
     int room[BUFF_SIZE][BUFF_SIZE]; // room[index][client_sockfd]
@@ -95,7 +96,7 @@ int is_number(const char *s);
 void *loginSession(void *client_sock);
 void send_to_others(char *mesg, int current_player, int room_number);
 char to_ABCD(int i);
-void offline5050(int connfd, int i, int j, int k, int true);
+void offline5050(int connfd, int i, int j, int k, int true, int state);
 
 /* -------------------------- Main Function -------------------------- */
 int main(int argc, char **argv) {
@@ -397,6 +398,7 @@ void addQuestion(int index, int level, char question[BUFF_SIZE], char answerA[BU
     strcpy(questionBank[level-1].questions[index].answerD, answerD);
     questionBank[level-1].questions[index].true = true;
     questionBank[level-1].questions[index].used = 0;
+    // questionBank[level-1].questions[index].help5050 = {0};
 }
 
 // Add client to linked list
@@ -913,7 +915,7 @@ void *loginSession(void *client_sock) {
                             int step = sqlite3_step(res);
                             if (step == SQLITE_ROW) { 
                                 char tmp[BUFF_SIZE] = {0};
-                                int sn = snprintf(tmp, sizeof(tmp), "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn: ", i+1,
+                                int sn = snprintf(tmp, sizeof(tmp), "Câu hỏi %d: %s\nA. %s\nB. %s\nC. %s\nD. %s\nĐáp án của bạn:\n", i+1,
                                 sqlite3_column_text(res, 1),
                                 sqlite3_column_text(res, 2),
                                 sqlite3_column_text(res, 3),
@@ -1011,7 +1013,7 @@ void *loginSession(void *client_sock) {
             }
             else if (cli->login_status == 1) {
                 srand(time(0));
-                int i, j, k, help;
+                int i, j, randNum, help;
                 for (i = 0; i < 15; i++) {
                     char tmp[BUFF_SIZE] = {0};
                     if (help == 0) { 
@@ -1032,22 +1034,36 @@ void *loginSession(void *client_sock) {
                             return NULL;
                         }
                     }
-                    help = 0;
                     if ((n = recv(connfd, buff, BUFF_SIZE, 0)) <= 0) {
                         printf("Host disconnected: socket_fd(%d)\n", connfd);
                         deleteClient(connfd);
                         return NULL;
                     }
                     buff[n] = '\0';
-                    printf(CYN "[%d - %s]: %s\n" RESET, cli->connfd, cli->login_account, buff);
-                    if (atoi(buff) == 5) {
+                    printf(CYN "[%d - %s]: %s\nHelp5050[0] = %d\nHelp5050[1] = %d\n" RESET, cli->connfd, cli->login_account, buff, questionBank[i].questions[j].help5050[0], questionBank[i].questions[j].help5050[1]);
+                    if (help == 1 && atoi(buff) == 5) {
+                        offline5050(connfd, i, j, randNum, questionBank[i].questions[j].true, 1);
+                        i--;
+                        continue;
+                    }
+                    if (help == 1 && atoi(buff) != questionBank[i].questions[j].help5050[0] &&
+                    atoi(buff) != questionBank[i].questions[j].help5050[1]) {
+                        offline5050(connfd, i, j, randNum, questionBank[i].questions[j].true, 2);
+                        i--;
+                        continue;
+                    } 
+                    else if (help == 1) {
+                        help = 0;
+                        memset(questionBank[i].questions[j].help5050, 0, sizeof(questionBank[i].questions[j].help5050));
+                    }
+                    if (help == 0 && atoi(buff) == 5) {
                         help = 1;
-                        do k = (rand() % (4 - 1 + 1)) + 1; // (upper - lower + 1)) + lower
-                        while (k == questionBank[i].questions[j].true);
-                        offline5050(connfd, i, j, k, questionBank[i].questions[j].true);
+                        randNum = (rand() % (4 - 1 + 1)) + 1; // (upper - lower + 1)) + lower
+                        while (randNum == questionBank[i].questions[j].true);
+                        offline5050(connfd, i, j, randNum, questionBank[i].questions[j].true, 0);
                         i--;
                     }
-                    else if (atoi(buff) != questionBank[i].questions[j].true) {
+                    else if (help == 0 && atoi(buff) != questionBank[i].questions[j].true) {
                         if (i == 0) sprintf(mesg, "Sai! Đáp án đúng là %c\nKém quá, bạn chưa trả lời đúng câu nào 🤣 🤣\n", to_ABCD(questionBank[i].questions[j].true));
                         else sprintf(mesg, "Sai! Đáp án đúng là %c\nBạn đã trả lời đúng %d câu hỏi.\n", to_ABCD(questionBank[i].questions[j].true), i);
                         printf("%s\n", mesg);
@@ -1122,9 +1138,9 @@ char to_ABCD(int i) {
     else return ' ';
 }
 
-void offline5050(int connfd, int i, int j, int k, int true) {
+void offline5050(int connfd, int i, int j, int k, int true, int state) {
     pthread_mutex_lock(&mutex);
-    char tmp[BUFF_SIZE], option1[BUFF_SIZE], option2[BUFF_SIZE];
+    char mesg[BUFF_SIZE], tmp[BUFF_SIZE], option1[BUFF_SIZE], option2[BUFF_SIZE];
     
     if (k == 1) strcpy(option1, questionBank[i].questions[j].answerA);
     else if (k == 2) strcpy(option1, questionBank[i].questions[j].answerB);
@@ -1136,19 +1152,27 @@ void offline5050(int connfd, int i, int j, int k, int true) {
     else if (true == 3) strcpy(option2, questionBank[i].questions[j].answerC);
     else strcpy(option2, questionBank[i].questions[j].answerD);
 
+    if (state == 0) strcpy(tmp, "Bạn đã sử dụng sự trợ giúp 50/50.");
+    else if (state == 1) strcpy(tmp, "Vừa sử dụng trợ giúp cho câu này rồi còn gì 👊 👊 Gửi lại này.");
+    else if (state == 2) strcpy(tmp, "Đáp án này bị loại rồi bạn ơi!! Gửi lại này.");
+
     if (k < true) {
-        int sn = snprintf(tmp, sizeof(tmp), "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
-                i+1, questionBank[i].questions[j].question, 
+        int sn = snprintf(mesg, sizeof(mesg), "%s\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+                tmp, i+1, questionBank[i].questions[j].question, 
                 to_ABCD(k), option1, to_ABCD(true), option2);
+        questionBank[i].questions[j].help5050[0] = k;
+        questionBank[i].questions[j].help5050[1] = true;
     }
     else {
-        int sn = snprintf(tmp, sizeof(tmp), "Bạn đã sử dụng sự trợ giúp 50/50.\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
-                i+1, questionBank[i].questions[j].question, 
+        int sn = snprintf(mesg, sizeof(mesg), "%s\nCâu hỏi %d: %s\n%c. %s\n%c. %s\nĐáp án của bạn: ", 
+                tmp, i+1, questionBank[i].questions[j].question, 
                 to_ABCD(true), option2, to_ABCD(k), option1);
+        questionBank[i].questions[j].help5050[0] = true;
+        questionBank[i].questions[j].help5050[1] = k;
     }
 
-    printf("%s\n", tmp);
-    if (send(connfd, tmp, strlen(tmp), 0) < 0) {
+    printf("%s\n", mesg);
+    if (send(connfd, mesg, strlen(mesg), 0) < 0) {
         perror("Send error");
         deleteClient(connfd);
     }
